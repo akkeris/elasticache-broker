@@ -11,8 +11,6 @@ import (
 	"github.com/golang/glog"
 	"net/http"
 	"os"
-	"os/exec"
-	"strings"
 	"time"
 )
 
@@ -33,7 +31,7 @@ const (
 type Task struct {
 	Id         string
 	Action     TaskAction
-	DatabaseId string
+	ResourceId string
 	Status     string
 	Retries    int64
 	Metadata   string
@@ -198,11 +196,11 @@ func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage S
 
 			if task.Retries >= 10 {
 				glog.Infof("Retry limit was reached for task: %s %d\n", task.Id, task.Retries)
-				FinishedTask(storage, task.Id, task.Retries, "Unable to delete database "+task.DatabaseId+" as it failed multiple times ("+task.Result+")", "failed")
+				FinishedTask(storage, task.Id, task.Retries, "Unable to delete database "+task.ResourceId+" as it failed multiple times ("+task.Result+")", "failed")
 				continue
 			}
 
-			Instance, err := GetInstanceById(namePrefix, storage, task.DatabaseId)
+			Instance, err := GetInstanceById(namePrefix, storage, task.ResourceId)
 
 			if err != nil {
 				UpdateTaskStatus(storage, task.Id, task.Retries+1, "Cannot get Instance: "+err.Error(), "pending")
@@ -226,16 +224,16 @@ func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage S
 			glog.Infof("Resyncing from provider for task: %s\n", task.Id)
 			if task.Retries >= 60 {
 				glog.Infof("Retry limit was reached for task: %s %d\n", task.Id, task.Retries)
-				FinishedTask(storage, task.Id, task.Retries, "Unable to resync information from provider for database "+task.DatabaseId+" as it failed multiple times ("+task.Result+")", "failed")
+				FinishedTask(storage, task.Id, task.Retries, "Unable to resync information from provider for database "+task.ResourceId+" as it failed multiple times ("+task.Result+")", "failed")
 				continue
 			}
-			Instance, err := GetInstanceById(namePrefix, storage, task.DatabaseId)
+			Instance, err := GetInstanceById(namePrefix, storage, task.ResourceId)
 			if err != nil {
 				glog.Infof("Failed to get provider instance for task: %s, %s\n", task.Id, err.Error())
 				UpdateTaskStatus(storage, task.Id, task.Retries+1, "Cannot get Instance: "+err.Error(), "pending")
 				continue
 			}
-			Entry, err := storage.GetInstance(task.DatabaseId)
+			Entry, err := storage.GetInstance(task.ResourceId)
 			if err != nil {
 				glog.Infof("Failed to get database instance for task: %s, %s\n", task.Id, err.Error())
 				UpdateTaskStatus(storage, task.Id, task.Retries+1, "Cannot get Entry: "+err.Error(), "pending")
@@ -257,10 +255,10 @@ func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage S
 			glog.Infof("Resyncing from provider until available for task: %s\n", task.Id)
 			if task.Retries >= 60 {
 				glog.Infof("Retry limit was reached for task: %s %d\n", task.Id, task.Retries)
-				FinishedTask(storage, task.Id, task.Retries, "Unable to resync information from provider for database "+task.DatabaseId+" as it failed multiple times ("+task.Result+")", "failed")
+				FinishedTask(storage, task.Id, task.Retries, "Unable to resync information from provider for database "+task.ResourceId+" as it failed multiple times ("+task.Result+")", "failed")
 				continue
 			}
-			Instance, err := GetInstanceById(namePrefix, storage, task.DatabaseId)
+			Instance, err := GetInstanceById(namePrefix, storage, task.ResourceId)
 			if err != nil {
 				glog.Infof("Failed to get provider instance for task: %s, %s\n", task.Id, err.Error())
 				UpdateTaskStatus(storage, task.Id, task.Retries+1, "Cannot get Instance: "+err.Error(), "pending")
@@ -280,10 +278,10 @@ func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage S
 			glog.Infof("Resyncing from provider until available (for perform post provision) for task: %s\n", task.Id)
 			if task.Retries >= 60 {
 				glog.Infof("Retry limit was reached for task: %s %d\n", task.Id, task.Retries)
-				FinishedTask(storage, task.Id, task.Retries, "Unable to resync information from provider for database "+task.DatabaseId+" as it failed multiple times ("+task.Result+")", "failed")
+				FinishedTask(storage, task.Id, task.Retries, "Unable to resync information from provider for database "+task.ResourceId+" as it failed multiple times ("+task.Result+")", "failed")
 				continue
 			}
-			Instance, err := GetInstanceById(namePrefix, storage, task.DatabaseId)
+			Instance, err := GetInstanceById(namePrefix, storage, task.ResourceId)
 			if err != nil {
 				glog.Infof("Failed to get provider instance for task: %s, %s\n", task.Id, err.Error())
 				UpdateTaskStatus(storage, task.Id, task.Retries, "Cannot get Instance: "+err.Error(), "pending")
@@ -324,7 +322,7 @@ func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage S
 				continue
 			}
 
-			Instance, err := GetInstanceById(namePrefix, storage, task.DatabaseId)
+			Instance, err := GetInstanceById(namePrefix, storage, task.ResourceId)
 			if err != nil {
 				UpdateTaskStatus(storage, task.Id, task.Retries+1, "Cannot get Instance: "+err.Error(), "pending")
 				continue
@@ -387,10 +385,10 @@ func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage S
 			glog.Infof("Changing plans for database: %s\n", task.Id)
 			if task.Retries >= 60 {
 				glog.Infof("Retry limit was reached for task: %s %d\n", task.Id, task.Retries)
-				FinishedTask(storage, task.Id, task.Retries, "Unable to change plans for database "+task.DatabaseId+" as it failed multiple times ("+task.Result+")", "failed")
+				FinishedTask(storage, task.Id, task.Retries, "Unable to change plans for database "+task.ResourceId+" as it failed multiple times ("+task.Result+")", "failed")
 				continue
 			}
-			Instance, err := GetInstanceById(namePrefix, storage, task.DatabaseId)
+			Instance, err := GetInstanceById(namePrefix, storage, task.ResourceId)
 			if err != nil {
 				glog.Infof("Failed to get provider instance for task: %s, %s\n", task.Id, err.Error())
 				UpdateTaskStatus(storage, task.Id, task.Retries, "Cannot get Instance: "+err.Error(), "pending")
@@ -415,10 +413,10 @@ func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage S
 			glog.Infof("Changing providers for database: %s\n", task.Id)
 			if task.Retries >= 60 {
 				glog.Infof("Retry limit was reached for task: %s %d\n", task.Id, task.Retries)
-				FinishedTask(storage, task.Id, task.Retries, "Unable to resync information from provider for database "+task.DatabaseId+" as it failed multiple times ("+task.Result+")", "failed")
+				FinishedTask(storage, task.Id, task.Retries, "Unable to resync information from provider for database "+task.ResourceId+" as it failed multiple times ("+task.Result+")", "failed")
 				continue
 			}
-			Instance, err := GetInstanceById(namePrefix, storage, task.DatabaseId)
+			Instance, err := GetInstanceById(namePrefix, storage, task.ResourceId)
 			if err != nil {
 				glog.Infof("Failed to get provider instance for task: %s, %s\n", task.Id, err.Error())
 				UpdateTaskStatus(storage, task.Id, task.Retries, "Cannot get Instance: " + err.Error(), "pending")

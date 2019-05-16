@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/golang/glog"
-	"time"
-	"sort"
 	"strings"
 	osb "github.com/pmorie/go-open-service-broker-client/v2"
 	"github.com/pmorie/osb-broker-lib/pkg/broker"
@@ -46,116 +44,49 @@ func (b *BusinessLogic) GetCatalog(c *broker.RequestContext) (*broker.CatalogRes
 }
 
 func (b *BusinessLogic) ActionFlushData(InstanceID string, vars map[string]string, context *broker.RequestContext) (interface{}, error) {
-	/*Instance, err := b.GetInstanceById(InstanceID)
+	Instance, err := b.GetInstanceById(InstanceID)
 	if err != nil {
 		return nil, NotFound()
 	}
-	dbUrl, err := b.storage.GetReplicas(Instance)
+	provider, err := GetProviderByPlan(b.namePrefix, Instance.Plan)
 	if err != nil {
-		glog.Errorf("Unable to get replica: %s\n", err.Error())
 		return nil, InternalServerError()
 	}
-	return dbUrl, nil*/
+	provider.Flush(Instance)
+	return map[string]string{"flush_all": "ok"}, nil
 }
 
 func (b *BusinessLogic) ActionGetStats(InstanceID string, vars map[string]string, context *broker.RequestContext) (interface{}, error) {
-	/*
 	Instance, err := b.GetInstanceById(InstanceID)
 	if err != nil {
 		return nil, NotFound()
 	}
-
-	b.Lock()
-	defer b.Unlock()
-
-	amount, err := b.storage.HasReplicas(Instance)
-	if err != nil {
-		glog.Errorf("Error determining if database has replicas: %s\n", err.Error())
-		return nil, InternalServerError()
-	}
-	if amount != 0 {
-		return nil, ConflictErrorWithMessage("Cannot create a replica, database already has one attached.")
-	}
-
 	provider, err := GetProviderByPlan(b.namePrefix, Instance.Plan)
 	if err != nil {
-		glog.Errorf("Unable to create read replica on db, cannot find provider (GetProviderByPlan failed): %s\n", err.Error())
 		return nil, InternalServerError()
 	}
-
-	newInstance, err := provider.CreateReadReplica(Instance)
+	result, err := provider.Stats(Instance)
 	if err != nil {
-		glog.Errorf("Unable to create read replica on db, CreateReadReplica failed: %s\n", err.Error())
+		glog.Errorf("Unable to pull stats: %s\n", err.Error())
 		return nil, InternalServerError()
 	}
-
-	if err = b.storage.AddReplica(newInstance); err != nil {
-		// TODO: Clean up.
-		glog.Errorf("Error inserting record into provisioned_replicas table: %s\n", err.Error())
-		provider.DeleteReadReplica(newInstance)
-		if err != nil {
-			glog.Errorf("Error cleaning up unrecorded database replica: %#v because %s\n", newInstance, err.Error())
-			// TODO add task to remove it later?
-		}
-		return nil, InternalServerError()
-	}
-
-	return ResourceUrlSpec{
-		Username: newInstance.Username,
-		Password: newInstance.Password,
-		Endpoint: newInstance.Endpoint,
-	}, nil
-	*/
+	return map[string][]Stat{"stats": result}, nil
 }
 
 func (b *BusinessLogic) ActionRestart(InstanceID string, vars map[string]string, context *broker.RequestContext) (interface{}, error) {
-	/*
 	Instance, err := b.GetInstanceById(InstanceID)
 	if err != nil {
 		return nil, NotFound()
 	}
-
-	b.Lock()
-	defer b.Unlock()
-
-	amount, err := b.storage.HasReplicas(Instance)
-	if err != nil {
-		glog.Errorf("Error determining if database has replicas: %s\n", err.Error())
-		return nil, InternalServerError()
-	}
-	if amount != 0 {
-		return nil, ConflictErrorWithMessage("Cannot create a replica, database already has one attached.")
-	}
-
 	provider, err := GetProviderByPlan(b.namePrefix, Instance.Plan)
 	if err != nil {
-		glog.Errorf("Unable to create read replica on db, cannot find provider (GetProviderByPlan failed): %s\n", err.Error())
 		return nil, InternalServerError()
 	}
-
-	newInstance, err := provider.CreateReadReplica(Instance)
-	if err != nil {
-		glog.Errorf("Unable to create read replica on db, CreateReadReplica failed: %s\n", err.Error())
+	if err := provider.Restart(Instance); err != nil {
+		glog.Errorf("Unable to restart: %s\n", err.Error())
 		return nil, InternalServerError()
 	}
-
-	if err = b.storage.AddReplica(newInstance); err != nil {
-		// TODO: Clean up.
-		glog.Errorf("Error inserting record into provisioned_replicas table: %s\n", err.Error())
-		provider.DeleteReadReplica(newInstance)
-		if err != nil {
-			glog.Errorf("Error cleaning up unrecorded database replica: %#v because %s\n", newInstance, err.Error())
-			// TODO add task to remove it later?
-		}
-		return nil, InternalServerError()
-	}
-
-	return ResourceUrlSpec{
-		Username: newInstance.Username,
-		Password: newInstance.Password,
-		Endpoint: newInstance.Endpoint,
-	}, nil
-	*/
+	return map[string]string{"restart": "ok"}, nil
 }
 
 func GetInstanceById(namePrefix string, storage Storage, Id string) (*Instance, error) {
@@ -221,6 +152,11 @@ func (b *BusinessLogic) Provision(request *osb.ProvisionRequest, c *broker.Reque
 		return nil, UnprocessableEntityWithMessage("InstanceRequired", "The instance ID was not provided.")
 	}
 
+	// Ensure we are not trying to provision a UUID that has ever been used before.
+	if err := b.storage.ValidateInstanceID(request.InstanceID); err != nil {
+		return nil, UnprocessableEntityWithMessage("InstanceInvalid", "The instance ID was either already in-use or invalid.")
+	}
+
 	plan, err := b.storage.GetPlanByID(request.PlanID)
 	if err != nil && err.Error() == "Not found" {
 		return nil, NotFound()
@@ -236,11 +172,11 @@ func (b *BusinessLogic) Provision(request *osb.ProvisionRequest, c *broker.Reque
 			return nil, ConflictErrorWithMessage("InstanceID in use")
 		}
 		response.Exists = true
-	} else if err != nil && err.Error() == "Cannot find database instance" {
+	} else if err != nil && err.Error() == "Cannot find resource instance" {
 		response.Exists = false
 		Instance, err = b.GetUnclaimedInstance(request.PlanID, request.InstanceID)
 
-		if err != nil && err.Error() == "Cannot find database instance" {
+		if err != nil && err.Error() == "Cannot find resource instance" {
 			// Create a new one
 			provider, err := GetProviderByPlan(b.namePrefix, plan)
 			if err != nil {
@@ -249,7 +185,7 @@ func (b *BusinessLogic) Provision(request *osb.ProvisionRequest, c *broker.Reque
 			}
 			Instance, err = provider.Provision(request.InstanceID, plan, request.OrganizationGUID)
 			if err != nil {
-				glog.Errorf("Error provisioning database: %s\n", err.Error())
+				glog.Errorf("Error provisioning resource: %s\n", err.Error())
 				return nil, InternalServerError()
 			}
 
@@ -257,7 +193,7 @@ func (b *BusinessLogic) Provision(request *osb.ProvisionRequest, c *broker.Reque
 				glog.Errorf("Error inserting record into provisioned table: %s\n", err.Error())
 
 				if err = provider.Deprovision(Instance, false); err != nil {
-					glog.Errorf("Error cleaning up (deprovision failed) after insert record failed but provision succeeded (Database Id:%s Name: %s) %s\n", Instance.Id, Instance.Name, err.Error())
+					glog.Errorf("Error cleaning up (deprovision failed) after insert record failed but provision succeeded (Resource Id:%s Name: %s) %s\n", Instance.Id, Instance.Name, err.Error())
 					if _, err = b.storage.AddTask(Instance.Id, DeleteTask, Instance.Name); err != nil {
 						glog.Errorf("Error: Unable to add task to delete instance, WE HAVE AN ORPHAN! (%s): %s\n", Instance.Name, err.Error())
 					}
@@ -308,7 +244,7 @@ func (b *BusinessLogic) Deprovision(request *osb.DeprovisionRequest, c *broker.R
 
 	response := broker.DeprovisionResponse{}
 	Instance, err := b.GetInstanceById(request.InstanceID)
-	if err != nil && err.Error() == "Cannot find database instance" {
+	if err != nil && err.Error() == "Cannot find resource instance" {
 		return nil, NotFound()
 	} else if err != nil {
 		glog.Errorf("Error finding instance id (during deprovision) from provisioned table: %s\n", err.Error())
@@ -346,7 +282,7 @@ func (b *BusinessLogic) Update(request *osb.UpdateInstanceRequest, c *broker.Req
 		return nil, UnprocessableEntity()
 	}
 	Instance, err := b.GetInstanceById(request.InstanceID)
-	if err != nil && err.Error() == "Cannot find database instance" {
+	if err != nil && err.Error() == "Cannot find resource instance" {
 		return nil, NotFound()
 	} else if err != nil {
 		glog.Errorf("Error finding instance id (during deprovision) from provisioned table: %s\n", err.Error())
@@ -366,7 +302,7 @@ func (b *BusinessLogic) Update(request *osb.UpdateInstanceRequest, c *broker.Req
 
 	target_plan, err := b.storage.GetPlanByID(*request.PlanID)
 	if err != nil {
-		glog.Errorf("Unable to provision database (GetPlanByID failed): %s\n", err.Error())
+		glog.Errorf("Unable to provision resource (GetPlanByID failed): %s\n", err.Error())
 		return nil, err
 	}
 
@@ -392,13 +328,13 @@ func (b *BusinessLogic) LastOperation(request *osb.LastOperationRequest, c *brok
 	
 	upgrading, err := b.storage.IsUpgrading(request.InstanceID)
 	if err != nil {
-		glog.Errorf("Unable to get database (%s) status, IsUpgrading failed: %s\n", request.InstanceID, err.Error()) 
+		glog.Errorf("Unable to get resource (%s) status, IsUpgrading failed: %s\n", request.InstanceID, err.Error()) 
 		return nil, InternalServerError()
 	}
 
 	restoring, err := b.storage.IsRestoring(request.InstanceID)
 	if err != nil {
-		glog.Errorf("Unable to get database (%s) status, IsRestoring failed: %s\n", request.InstanceID, err.Error()) 
+		glog.Errorf("Unable to get resource (%s) status, IsRestoring failed: %s\n", request.InstanceID, err.Error()) 
 		return nil, InternalServerError()
 	}
 
@@ -424,10 +360,10 @@ func (b *BusinessLogic) LastOperation(request *osb.LastOperationRequest, c *brok
 
 
 	Instance, err := b.GetInstanceById(request.InstanceID)
-	if err != nil && err.Error() == "Cannot find database instance" {
+	if err != nil && err.Error() == "Cannot find resource instance" {
 		return nil, NotFound()
 	} else if err != nil {
-		glog.Errorf("Unable to get database (%s) status: %s\n", request.InstanceID, err.Error()) 
+		glog.Errorf("Unable to get resource (%s) status: %s\n", request.InstanceID, err.Error()) 
 		return nil, InternalServerError()
 	}
 	
@@ -450,7 +386,7 @@ func (b *BusinessLogic) Bind(request *osb.BindRequest, c *broker.RequestContext)
 	b.Lock()
 	defer b.Unlock()
 	Instance, err := b.GetInstanceById(request.InstanceID)
-	if err != nil && err.Error() == "Cannot find database instance" {
+	if err != nil && err.Error() == "Cannot find resource instance" {
 		return nil, NotFound()
 	} else if err != nil {
 		glog.Errorf("Error finding instance id (during getbinding): %s\n", err.Error())
@@ -490,7 +426,7 @@ func (b *BusinessLogic) Unbind(request *osb.UnbindRequest, c *broker.RequestCont
 	defer b.Unlock()
 
 	Instance, err := b.GetInstanceById(request.InstanceID)
-	if err != nil && err.Error() == "Cannot find database instance" {
+	if err != nil && err.Error() == "Cannot find resource instance" {
 		return nil, NotFound()
 	} else if err != nil {
 		glog.Errorf("Error finding instance id (during getbinding): %s\n", err.Error())
@@ -531,18 +467,19 @@ func (b *BusinessLogic) GetBinding(request *osb.GetBindingRequest, context *brok
 	if err == nil && !CanGetBindings(Instance.Status) {
 		return nil, UnprocessableEntityWithMessage("ServiceNotYetAvailable", "The service requested is not yet available.")
 	}
-	if err != nil && err.Error() == "Cannot find database instance" {
+	if err != nil && err.Error() == "Cannot find resource instance" {
 		return nil, NotFound()
 	} else if err != nil {
 		glog.Errorf("Error finding instance id (during getbinding): %s\n", err.Error())
 		return nil, err
 	}
-
-	return &broker.BindResponse{
-		BindResponse: osb.BindResponse{
-			Async: false,
-			Credentials:provider.GetUrl(Instance),
-		},
+	provider, err := GetProviderByPlan(b.namePrefix, Instance.Plan)
+	if err != nil {
+		glog.Errorf("Unable to provision, cannot find provider (GetProviderByPlan failed): %s\n", err.Error())
+		return nil, InternalServerError()
+	}
+	return &osb.GetBindingResponse{
+		Credentials: provider.GetUrl(Instance),
 	}, nil
 }
 

@@ -72,15 +72,16 @@ func InProgress(status string) bool {
 		status == "rebooting" || status == "moving-to-vpc" ||
 		status == "renaming" || status == "upgrading" || status == "backtracking" ||
 		status == "maintenance" || status == "resetting-master-credentials" ||
+		status == "rebooting cluster nodes" ||
 		// gcloud states
 		status == "PENDING_CREATE" || status == "MAINTENANCE"
-
 }
 
 func CanGetBindings(status string) bool {
 	// Should we potentially add upgrading to this list?
-	return  status != "creating" && status != "starting" && 
-			status != "stopping" && status != "stopped" && status != "deleting" &&
+	return  status != "creating" && status != "starting" && status != "modifying" &&
+			status != "stopping" && status != "stopped" && status != "deleting" && status != "deleted" &&
+			status != "incompatible-network" &&
 			// gcloud states
 			status != "SUSPENDED" && status != "PENDING_CREATE" && status != "MAINTENANCE" &&
 			status != "FAILED" && status != "UNKNOWN_STATE"
@@ -92,28 +93,14 @@ func CanBeModified(status string) bool {
 		status != "rebooting" && status != "moving-to-vpc" && status != "backing-up" &&
 		status != "renaming" && status != "upgrading" && status != "backtracking" &&
 		status != "maintenance" && status != "resetting-master-credentials" &&
+		status != "deleted" && status != "rebooting cluster nodes" &&
 		// gcloud states
 		status != "SUSPENDED" && status != "PENDING_CREATE" && status != "MAINTENANCE" &&
 		status != "FAILED" && status != "UNKNOWN_STATE"
 }
 
+//available, failed, incompatible-parameters, incompatible-network, restore-failed, recovering
 func CanBeDeleted(status string) bool {
-	return status != "creating" && status != "starting" &&
-		status != "rebooting" && status != "moving-to-vpc" && status != "backing-up" &&
-		status != "renaming" && status != "upgrading" && status != "backtracking" &&
-		status != "maintenance" && status != "resetting-master-credentials" && 
-		status != "SUSPENDED" && status != "PENDING_CREATE" && status != "MAINTENANCE" &&
-		status != "FAILED" && status != "UNKNOWN_STATE"
+	return 	status == "available" || status == "failed" || status == "incompatible-parameters" || 
+			status == "incompatible-network" || status == "restore-failed" || status == "recovering"
 }
-
-/** gcloud settings **/
-// State: The current serving state of the Cloud SQL instance. This can
-    // be one of the following.
-    // RUNNABLE: The instance is running, or is ready to run when
-    // accessed.
-    // SUSPENDED: The instance is not available, for example due to problems
-    // with billing.
-    // PENDING_CREATE: The instance is being created.
-    // MAINTENANCE: The instance is down for maintenance.
-    // FAILED: The instance creation failed.
-    // UNKNOWN_STATE: The state of the instance is unknown.

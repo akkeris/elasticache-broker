@@ -6,12 +6,11 @@ import (
 	"github.com/golang/glog"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/rds"
+	"github.com/aws/aws-sdk-go/service/elasticache"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-	"fmt"
 )
 
 type AWSInstanceRedisProvider struct {
@@ -47,21 +46,18 @@ func (provider AWSInstanceRedisProvider) GetInstance(name string, plan *Provider
 	resp, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
 		CacheClusterId: 	aws.String(name),
 		MaxRecords: 		aws.Int64(20),
-		ShowCacheNodeInfo: 	aws.Bool(true)
+		ShowCacheNodeInfo: 	aws.Bool(true),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if len(resp.CacheClusters) < 1 || len(resp.CacheClusters[0].CacheNodes) < 1 {
-		reutrn nil, errors.New("No cluster or nodes were found in instance.")
-	}
 	var endpoint = ""
-	if resp.CacheClusters[0].CacheNodes[0].Endpoint != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Port != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Address != nil {
+	if len(resp.CacheClusters) > 0 && len(resp.CacheClusters[0].CacheNodes) > 0 && resp.CacheClusters[0].CacheNodes[0].Endpoint != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Port != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Address != nil {
 		endpoint = *resp.CacheClusters[0].CacheNodes[0].Endpoint.Address + ":" + strconv.FormatInt(*resp.CacheClusters[0].CacheNodes[0].Endpoint.Port, 10)
 	}
 	provider.instanceCache[name + plan.ID] = &Instance{
 		Id:            "", // providers should not store this.
-		ProviderId:    *resp.CacheClusters[0].ClusterId,
+		ProviderId:    *resp.CacheClusters[0].CacheClusterId,
 		Name:          name,
 		Plan:          plan,
 		Username:      "", // providers should not store this.
@@ -82,8 +78,8 @@ func (provider AWSInstanceRedisProvider) PerformPostProvision(db *Instance) (*In
 }
 
 func (provider AWSInstanceRedisProvider) GetUrl(instance *Instance) map[string]interface{} {
-	return map[string]{}interface{
-		"MEMCACHED_URL":instance.Scheme + "://" + instance.Endpoint
+	return map[string]interface{}{
+		"REDIS_URL":instance.Scheme + "://" + instance.Endpoint,
 	}
 }
 
@@ -93,27 +89,23 @@ func (provider AWSInstanceRedisProvider) ProvisionWithSettings(Id string, plan *
 		return nil, err
 	}
 
-	if len(resp.CacheClusters) < 1 || len(resp.CacheClusters[0].CacheNodes) < 1 {
-		reutrn nil, errors.New("No cluster or nodes were found in instance.")
-	}
-
 	var endpoint = ""
-	if resp.CacheClusters[0].CacheNodes[0].Endpoint != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Port != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Address != nil {
-		endpoint = *resp.CacheClusters[0].CacheNodes[0].Endpoint.Address + ":" + strconv.FormatInt(*resp.CacheClusters[0].CacheNodes[0].Endpoint.Port, 10)
+	if len(resp.CacheCluster.CacheNodes) > 0 && resp.CacheCluster.CacheNodes[0].Endpoint != nil && resp.CacheCluster.CacheNodes[0].Endpoint.Port != nil && resp.CacheCluster.CacheNodes[0].Endpoint.Address != nil {
+		endpoint = *resp.CacheCluster.CacheNodes[0].Endpoint.Address + ":" + strconv.FormatInt(*resp.CacheCluster.CacheNodes[0].Endpoint.Port, 10)
 	}
 
 	return &Instance{
 		Id:            Id,
-		Name:          *resp.CacheClusters[0].ClusterId,
-		ProviderId:    *resp.CacheClusters[0].ClusterId,
+		Name:          *resp.CacheCluster.CacheClusterId,
+		ProviderId:    *resp.CacheCluster.CacheClusterId,
 		Plan:          plan,
 		Username:      "",
 		Password:      "",
 		Endpoint:      endpoint,
-		Status:        *resp.CacheClusters[0].CacheClusterStatus,
-		Ready:         IsReady(*resp.CacheClusters[0].CacheClusterStatus),
-		Engine:        *resp.CacheClusters[0].Engine,
-		EngineVersion: *resp.CacheClusters[0].EngineVersion,
+		Status:        *resp.CacheCluster.CacheClusterStatus,
+		Ready:         IsReady(*resp.CacheCluster.CacheClusterStatus),
+		Engine:        *resp.CacheCluster.Engine,
+		EngineVersion: *resp.CacheCluster.EngineVersion,
 		Scheme:        plan.Scheme,
 	}, nil
 }
@@ -130,36 +122,29 @@ func (provider AWSInstanceRedisProvider) Provision(Id string, plan *ProviderPlan
 }
 
 func (provider AWSInstanceRedisProvider) Deprovision(Instance *Instance, takeSnapshot bool) error {
-	resp, err := provider.awssvc.DeleteCacheCluster(&elasticache.DeleteCacheClusterInput{
-		CacheClusterId: aws.String(instance.ProviderId),
+	var snapshot *string = nil
+	if takeSnapshot {
+		snapshot = aws.String(Instance.ProviderId + "-final")
+	}
+	_, err := provider.awssvc.DeleteCacheCluster(&elasticache.DeleteCacheClusterInput{
+		CacheClusterId: aws.String(Instance.ProviderId),
+		FinalSnapshotIdentifier: snapshot,
 	})
 	return err
 }
 
-func (provider AWSInstanceRedisProvider) ModifyWithSettings(Instance *Instance, plan *ProviderPlan, settings *elasticache.CreateCacheClusterInput) (*Instance, error) {
-	resp, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
-		CacheClusterId: 	aws.String(Instance.ProviderId),
-		MaxRecords: 		aws.Int64(20),
-		ShowCacheNodeInfo: 	aws.Bool(true)
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(resp.CacheClusters) < 1 || len(resp.CacheClusters[0].CacheNodes) < 1 {
-		reutrn nil, errors.New("No cluster or nodes were found in instance.")
-	}
-	glog.Infof("Instance: %s modifying settings...\n", Instance.Id)
-	resp, err := provider.awssvc.ModifyInstance(&elasticache.ModifyCacheClusterInput{
-		AZMode:        				settings.AZmode,
+func (provider AWSInstanceRedisProvider) ModifyWithSettings(instance *Instance, plan *ProviderPlan, settings *elasticache.CreateCacheClusterInput) (*Instance, error) {
+	glog.Infof("Instance: %s modifying settings...\n", instance.Id)
+	resp, err := provider.awssvc.ModifyCacheCluster(&elasticache.ModifyCacheClusterInput{
+		AZMode:        				settings.AZMode,
 		ApplyImmediately: 			aws.Bool(true),
 		AutoMinorVersionUpgrade:	settings.AutoMinorVersionUpgrade,
-		CacheClusterId:				aws.String(Instance.ProviderId),
+		CacheClusterId:				aws.String(instance.ProviderId),
 		CacheNodeType:         	 	settings.CacheNodeType,
 		CacheParameterGroupName:   	settings.CacheParameterGroupName,
 		CacheSecurityGroupNames:    settings.CacheSecurityGroupNames,
 		EngineVersion:      		settings.EngineVersion,
 		NotificationTopicArn:		settings.NotificationTopicArn,
-		NotificationTopicStatus:	settings.NotificationTopicStatus,
 		NumCacheNodes:     			settings.NumCacheNodes,
 		PreferredMaintenanceWindow: settings.PreferredMaintenanceWindow,
 		SecurityGroupIds:			settings.SecurityGroupIds,
@@ -174,34 +159,34 @@ func (provider AWSInstanceRedisProvider) ModifyWithSettings(Instance *Instance, 
 	<-tick.C
 
 	var endpoint = ""
-	if resp.CacheClusters[0].CacheNodes[0].Endpoint != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Port != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Address != nil {
-		endpoint = *resp.CacheClusters[0].CacheNodes[0].Endpoint.Address + ":" + strconv.FormatInt(*resp.CacheClusters[0].CacheNodes[0].Endpoint.Port, 10)
+	if resp.CacheCluster.CacheNodes[0].Endpoint != nil && resp.CacheCluster.CacheNodes[0].Endpoint.Port != nil && resp.CacheCluster.CacheNodes[0].Endpoint.Address != nil {
+		endpoint = *resp.CacheCluster.CacheNodes[0].Endpoint.Address + ":" + strconv.FormatInt(*resp.CacheCluster.CacheNodes[0].Endpoint.Port, 10)
 	}
 
-	resp, err = provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
-		CacheClusterId: 	aws.String(Instance.ProviderId),
+	res, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
+		CacheClusterId: 	aws.String(instance.ProviderId),
 		MaxRecords: 		aws.Int64(20),
-		ShowCacheNodeInfo: 	aws.Bool(true)
+		ShowCacheNodeInfo: 	aws.Bool(true),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if len(resp.CacheClusters) < 1 || len(resp.CacheClusters[0].CacheNodes) < 1 {
-		reutrn nil, errors.New("No cluster or nodes were found in instance after modification!")
+	if len(res.CacheClusters) < 1 || len(res.CacheClusters[0].CacheNodes) < 1 {
+		return nil, errors.New("No cluster or nodes were found in instance after modification!")
 	}
-	glog.Infof("Instance: %s modifications finished.\n", Instance.Id)
+	glog.Infof("Instance: %s modifications finished.\n", instance.Id)
 	return &Instance{
-		Id:            Instance.Id,
-		Name:          Instance.Name,
-		ProviderId:    *resp.CacheClusters[0].ClusterId,
+		Id:            instance.Id,
+		Name:          instance.Name,
+		ProviderId:    *res.CacheClusters[0].CacheClusterId,
 		Plan:          plan,
 		Username:      "",
 		Password:      "",
 		Endpoint:      endpoint,
-		Status:        *resp.CacheClusters[0].CacheClusterStatus,
-		Ready:         IsReady(*resp.CacheClusters[0].CacheClusterStatus),
-		Engine:        *resp.CacheClusters[0].Engine,
-		EngineVersion: *resp.CacheClusters[0].EngineVersion,
+		Status:        *res.CacheClusters[0].CacheClusterStatus,
+		Ready:         IsReady(*res.CacheClusters[0].CacheClusterStatus),
+		Engine:        *res.CacheClusters[0].Engine,
+		EngineVersion: *res.CacheClusters[0].EngineVersion,
 		Scheme:        plan.Scheme,
 	}, nil
 }
@@ -210,17 +195,10 @@ func (provider AWSInstanceRedisProvider) Modify(Instance *Instance, plan *Provid
 	if !CanBeModified(Instance.Status) {
 		return nil, errors.New("Databases cannot be modifed during backups, upgrades or while maintenance is being performed.")
 	}
-	/*
 	var settings elasticache.CreateCacheClusterInput
 	if err := json.Unmarshal([]byte(plan.providerPrivateDetails), &settings); err != nil {
 		return nil, err
 	}
-
-	var oldSettings elasticache.CreateCacheClusterInput 
-	if err := json.Unmarshal([]byte(Instance.Plan.providerPrivateDetails), &oldSettings); err != nil {
-		return nil, err
-	}
-	*/
 	return provider.ModifyWithSettings(Instance, plan, &settings)
 }
 
@@ -250,21 +228,35 @@ func (provider AWSInstanceRedisProvider) Untag(Instance *Instance, Name string) 
 }
 
 func (provider AWSInstanceRedisProvider) Restart(Instance *Instance) error {
-	// What about replica?
 	if !Instance.Ready {
 		return errors.New("Cannot restart a database that is unavailable.")
 	}
-	_, err := provider.awssvc.RebootInstance(&elasticache.RebootCacheCluster{
-		CacheClusterId: aws.String(Instance.ProvideId),
-		CacheNodeIdsToReboot: []string{"all"},
+	res, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
+		CacheClusterId: 	aws.String(Instance.ProviderId),
+		MaxRecords: 		aws.Int64(20),
+		ShowCacheNodeInfo: 	aws.Bool(true),
+	})
+	if err != nil {
+		return err
+	}
+	if len(res.CacheClusters) < 1 || len(res.CacheClusters[0].CacheNodes) < 1 {
+		return errors.New("No cluster or nodes were found to reboot!")
+	}
+	var nodes []*string
+	for _, node := range res.CacheClusters[0].CacheNodes {
+		nodes = append(nodes, node.CacheNodeId)
+	}
+	_, err = provider.awssvc.RebootCacheCluster(&elasticache.RebootCacheClusterInput{
+		CacheClusterId: aws.String(Instance.ProviderId),
+		CacheNodeIdsToReboot: nodes,
 	})
 	return err
 }
 
-func (provider AWSInstanceRedisProvider) Flush(Instance *instance) error {
-	return errors.New("Redis does not support flush operations.")
+func (provider AWSInstanceRedisProvider) Flush(Instance *Instance) error {
+	return errors.New("Flush is not available on redis instances.")
 }
 
-func (provider AWSInstanceRedisProvider) Stats(Instance *instance) ([]Stat, error) {
-	return errors.New("Redis does not support flush stats.")
+func (provider AWSInstanceRedisProvider) Stats(Instance *Instance) ([]Stat, error) {
+	return nil, errors.New("Stats are not available on redis instances.")
 }

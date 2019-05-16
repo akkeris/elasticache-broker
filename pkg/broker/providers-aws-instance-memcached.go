@@ -3,15 +3,15 @@ package broker
 import (
 	"encoding/json"
 	"errors"
-	"github.com/golang/glog"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/rds"
+	"github.com/aws/aws-sdk-go/service/elasticache"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-	"fmt"
+	"net"
+	"io/ioutil"
 )
 
 type AWSInstanceMemcachedProvider struct {
@@ -47,21 +47,18 @@ func (provider AWSInstanceMemcachedProvider) GetInstance(name string, plan *Prov
 	resp, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
 		CacheClusterId: 	aws.String(name),
 		MaxRecords: 		aws.Int64(20),
-		ShowCacheNodeInfo: 	aws.Bool(true)
+		ShowCacheNodeInfo: 	aws.Bool(true),
 	})
 	if err != nil {
 		return nil, err
 	}
-	if len(resp.CacheClusters) < 1 || len(resp.CacheClusters[0].CacheNodes) < 1 {
-		reutrn nil, errors.New("No cluster or nodes were found in instance.")
-	}
 	var endpoint = ""
-	if resp.CacheClusters[0].CacheNodes[0].Endpoint != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Port != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Address != nil {
+	if len(resp.CacheClusters) > 0 && len(resp.CacheClusters[0].CacheNodes) > 0 && resp.CacheClusters[0].CacheNodes[0].Endpoint != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Port != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Address != nil {
 		endpoint = *resp.CacheClusters[0].CacheNodes[0].Endpoint.Address + ":" + strconv.FormatInt(*resp.CacheClusters[0].CacheNodes[0].Endpoint.Port, 10)
 	}
 	provider.instanceCache[name + plan.ID] = &Instance{
 		Id:            "", // providers should not store this.
-		ProviderId:    *resp.CacheClusters[0].ClusterId,
+		ProviderId:    *resp.CacheClusters[0].CacheClusterId,
 		Name:          name,
 		Plan:          plan,
 		Username:      "", // providers should not store this.
@@ -82,8 +79,8 @@ func (provider AWSInstanceMemcachedProvider) PerformPostProvision(db *Instance) 
 }
 
 func (provider AWSInstanceMemcachedProvider) GetUrl(instance *Instance) map[string]interface{} {
-	return map[string]{}interface{
-		"MEMCACHED_URL":instance.Scheme + "://" + instance.Endpoint
+	return map[string]interface{}{
+		"MEMCACHED_URL":instance.Scheme + "://" + instance.Endpoint,
 	}
 }
 
@@ -93,27 +90,23 @@ func (provider AWSInstanceMemcachedProvider) ProvisionWithSettings(Id string, pl
 		return nil, err
 	}
 
-	if len(resp.CacheClusters) < 1 || len(resp.CacheClusters[0].CacheNodes) < 1 {
-		reutrn nil, errors.New("No cluster or nodes were found in instance.")
-	}
-
 	var endpoint = ""
-	if resp.CacheClusters[0].CacheNodes[0].Endpoint != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Port != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Address != nil {
-		endpoint = *resp.CacheClusters[0].CacheNodes[0].Endpoint.Address + ":" + strconv.FormatInt(*resp.CacheClusters[0].CacheNodes[0].Endpoint.Port, 10)
+	if len(resp.CacheCluster.CacheNodes) > 0 && resp.CacheCluster.CacheNodes[0].Endpoint != nil && resp.CacheCluster.CacheNodes[0].Endpoint.Port != nil && resp.CacheCluster.CacheNodes[0].Endpoint.Address != nil {
+		endpoint = *resp.CacheCluster.CacheNodes[0].Endpoint.Address + ":" + strconv.FormatInt(*resp.CacheCluster.CacheNodes[0].Endpoint.Port, 10)
 	}
 
 	return &Instance{
 		Id:            Id,
-		Name:          *resp.CacheClusters[0].ClusterId,
-		ProviderId:    *resp.CacheClusters[0].ClusterId,
+		Name:          *resp.CacheCluster.CacheClusterId,
+		ProviderId:    *resp.CacheCluster.CacheClusterId,
 		Plan:          plan,
 		Username:      "",
 		Password:      "",
 		Endpoint:      endpoint,
-		Status:        *resp.CacheClusters[0].CacheClusterStatus,
-		Ready:         IsReady(*resp.CacheClusters[0].CacheClusterStatus),
-		Engine:        *resp.CacheClusters[0].Engine,
-		EngineVersion: *resp.CacheClusters[0].EngineVersion,
+		Status:        *resp.CacheCluster.CacheClusterStatus,
+		Ready:         IsReady(*resp.CacheCluster.CacheClusterStatus),
+		Engine:        *resp.CacheCluster.Engine,
+		EngineVersion: *resp.CacheCluster.EngineVersion,
 		Scheme:        plan.Scheme,
 	}, nil
 }
@@ -130,98 +123,34 @@ func (provider AWSInstanceMemcachedProvider) Provision(Id string, plan *Provider
 }
 
 func (provider AWSInstanceMemcachedProvider) Deprovision(Instance *Instance, takeSnapshot bool) error {
-	resp, err := provider.awssvc.DeleteCacheCluster(&elasticache.DeleteCacheClusterInput{
-		CacheClusterId: aws.String(instance.ProviderId),
+	// memcached does not support snapshots.
+	_, err := provider.awssvc.DeleteCacheCluster(&elasticache.DeleteCacheClusterInput{
+		CacheClusterId: aws.String(Instance.ProviderId),
 	})
 	return err
 }
 
-func (provider AWSInstanceMemcachedProvider) ModifyWithSettings(Instance *Instance, plan *ProviderPlan, settings *elasticache.CreateCacheClusterInput) (*Instance, error) {
-	resp, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
-		CacheClusterId: 	aws.String(Instance.ProviderId),
-		MaxRecords: 		aws.Int64(20),
-		ShowCacheNodeInfo: 	aws.Bool(true)
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(resp.CacheClusters) < 1 || len(resp.CacheClusters[0].CacheNodes) < 1 {
-		reutrn nil, errors.New("No cluster or nodes were found in instance.")
-	}
-	glog.Infof("Instance: %s modifying settings...\n", Instance.Id)
-	resp, err := provider.awssvc.ModifyInstance(&elasticache.ModifyCacheClusterInput{
-		AZMode:        				settings.AZmode,
-		ApplyImmediately: 			aws.Bool(true),
-		AutoMinorVersionUpgrade:	settings.AutoMinorVersionUpgrade,
-		CacheClusterId:				aws.String(Instance.ProviderId),
-		CacheNodeType:         	 	settings.CacheNodeType,
-		CacheParameterGroupName:   	settings.CacheParameterGroupName,
-		CacheSecurityGroupNames:    settings.CacheSecurityGroupNames,
-		EngineVersion:      		settings.EngineVersion,
-		NotificationTopicArn:		settings.NotificationTopicArn,
-		NotificationTopicStatus:	settings.NotificationTopicStatus,
-		NumCacheNodes:     			settings.NumCacheNodes,
-		PreferredMaintenanceWindow: settings.PreferredMaintenanceWindow,
-		SecurityGroupIds:			settings.SecurityGroupIds,
-		SnapshotRetentionLimit:   	settings.SnapshotRetentionLimit,
-		SnapshotWindow:             settings.SnapshotWindow,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	tick := time.NewTicker(time.Second * 30)
-	<-tick.C
-
-	var endpoint = ""
-	if resp.CacheClusters[0].CacheNodes[0].Endpoint != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Port != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Address != nil {
-		endpoint = *resp.CacheClusters[0].CacheNodes[0].Endpoint.Address + ":" + strconv.FormatInt(*resp.CacheClusters[0].CacheNodes[0].Endpoint.Port, 10)
-	}
-
-	resp, err = provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
-		CacheClusterId: 	aws.String(Instance.ProviderId),
-		MaxRecords: 		aws.Int64(20),
-		ShowCacheNodeInfo: 	aws.Bool(true)
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(resp.CacheClusters) < 1 || len(resp.CacheClusters[0].CacheNodes) < 1 {
-		reutrn nil, errors.New("No cluster or nodes were found in instance after modification!")
-	}
-	glog.Infof("Instance: %s modifications finished.\n", Instance.Id)
-	return &Instance{
-		Id:            Instance.Id,
-		Name:          Instance.Name,
-		ProviderId:    *resp.CacheClusters[0].ClusterId,
-		Plan:          plan,
-		Username:      "",
-		Password:      "",
-		Endpoint:      endpoint,
-		Status:        *resp.CacheClusters[0].CacheClusterStatus,
-		Ready:         IsReady(*resp.CacheClusters[0].CacheClusterStatus),
-		Engine:        *resp.CacheClusters[0].Engine,
-		EngineVersion: *resp.CacheClusters[0].EngineVersion,
-		Scheme:        plan.Scheme,
-	}, nil
-}
-
 func (provider AWSInstanceMemcachedProvider) Modify(Instance *Instance, plan *ProviderPlan) (*Instance, error) {
+	// Memcached cannot be upgraded really, only a few trivial parameters can be
+	// changed, so we'll nuke the old instance, wait for it to die, then create a 
+	// new instance with the same identifier.
 	if !CanBeModified(Instance.Status) {
 		return nil, errors.New("Databases cannot be modifed during backups, upgrades or while maintenance is being performed.")
 	}
-	/*
 	var settings elasticache.CreateCacheClusterInput
 	if err := json.Unmarshal([]byte(plan.providerPrivateDetails), &settings); err != nil {
 		return nil, err
 	}
-
-	var oldSettings elasticache.CreateCacheClusterInput 
-	if err := json.Unmarshal([]byte(Instance.Plan.providerPrivateDetails), &oldSettings); err != nil {
+	if err := provider.Deprovision(Instance, false); err != nil {
 		return nil, err
 	}
-	*/
-	return provider.ModifyWithSettings(Instance, plan, &settings)
+	provider.awssvc.WaitUntilCacheClusterDeleted(&elasticache.DescribeCacheClustersInput{
+		CacheClusterId: aws.String(Instance.ProviderId),
+		MaxRecords: 		aws.Int64(20),
+		ShowCacheNodeInfo: 	aws.Bool(true),
+	})
+	settings.CacheClusterId = aws.String(Instance.ProviderId)
+	return provider.ProvisionWithSettings(Instance.Id, plan, &settings)
 }
 
 func (provider AWSInstanceMemcachedProvider) Tag(Instance *Instance, Name string, Value string) error {
@@ -250,18 +179,32 @@ func (provider AWSInstanceMemcachedProvider) Untag(Instance *Instance, Name stri
 }
 
 func (provider AWSInstanceMemcachedProvider) Restart(Instance *Instance) error {
-	// What about replica?
 	if !Instance.Ready {
 		return errors.New("Cannot restart a database that is unavailable.")
 	}
-	_, err := provider.awssvc.RebootInstance(&elasticache.RebootCacheCluster{
-		CacheClusterId: aws.String(Instance.ProvideId),
-		CacheNodeIdsToReboot: []string{"all"},
+	res, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
+		CacheClusterId: 	aws.String(Instance.ProviderId),
+		MaxRecords: 		aws.Int64(20),
+		ShowCacheNodeInfo: 	aws.Bool(true),
+	})
+	if err != nil {
+		return err
+	}
+	if len(res.CacheClusters) < 1 || len(res.CacheClusters[0].CacheNodes) < 1 {
+		return errors.New("No cluster or nodes were found to reboot!")
+	}
+	var nodes []*string
+	for _, node := range res.CacheClusters[0].CacheNodes {
+		nodes = append(nodes, node.CacheNodeId)
+	}
+	_, err = provider.awssvc.RebootCacheCluster(&elasticache.RebootCacheClusterInput{
+		CacheClusterId: aws.String(Instance.ProviderId),
+		CacheNodeIdsToReboot: nodes,
 	})
 	return err
 }
 
-func (provider AWSInstanceRedisProvider) Flush(Instance *instance) error {
+func (provider AWSInstanceMemcachedProvider) Flush(Instance *Instance) error {
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", Instance.Endpoint)
 	if err != nil {
 		return err
@@ -278,7 +221,7 @@ func (provider AWSInstanceRedisProvider) Flush(Instance *instance) error {
 	return nil
 }
 
-func (provider AWSInstanceRedisProvider) Stats(Instance *instance) ([]string, error) {
+func (provider AWSInstanceMemcachedProvider) Stats(Instance *Instance) ([]Stat, error) {
 	var stats []Stat
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", Instance.Endpoint)
 	if err != nil {

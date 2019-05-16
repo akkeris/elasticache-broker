@@ -10,26 +10,20 @@ A database broker for a variety of cloud providers and even on-prem db systems t
 
 The broker has support for the following providers
 
-* AWS RDS Instances and Clusters
-* Gcloud SQL Instances and Clusters
-* Postgres Databases via Shared Tenant
-* MySQL 5.5, 5.7, 8 Databases via Shared Tenant
+* AWS Memcached
+* AWS Redis
 
 ## Features
 
 * Create your own plans
 * Upgrade plans
-* Take backups, list and restore
-* Database Read-Only Replicas
-* Extra Database Accounts (read-only, read-write, create, remove, rotate password)
-* Database Logs
 * Restart
-* Preprovisioning databases for speed
-* Generate and issue KMS keys stored on fortanix
+* Preprovisioning memcached and redis instances for speed
 
 ## Installing
 
-First, set your settings, so to speak, although not required these installation instructions assume you're deploying to a dockerized environment.  You'll also need to provision (manually) a postgres database so the database broker can store plans, databases and other information for itself.  Once you have your settings, move on to the deploy step, then finally setup your [docs/PLANS.md](plans).
+1. Create a postgres database
+2. Deploy the docker image (both worker and api) `akkeris/elasticache-broker:latest` run `start.sh` for the api, `start-backgrouund.sh` for worker. Both should use the same settigs (env) below.
 
 ### 1. Settings
 
@@ -43,24 +37,12 @@ Note almost all of these can be set via the command line as well.
 **AWS Provider Specific**
 
 * `AWS_REGION` - The AWS region to provision databases in, only one aws provider and region are supported by the database broker.
-* `AWS_VPC_SECURITY_GROUPS` - The VPC security groups to automatically assign for all VPC instances, this overrides any plan settings and is recommended you set this in the environment.
 * `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` to an IAM role that has full access to RDS in the `AWS_REGION` you specified above.
+* `ELASTICACHE_SECURITY_GROUP` The security group in AWS for elasticache instances.
+* `REDIS_SUBNET_GROUP` is the subnet group for redis instances.
+* `MEMCACHED_SUBNET_GROUP` is the subnet group for memcached instances.
 
 Note that you can get away with not setting `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` and use EC2 IAM roles or hard coded credentials via the `~/.aws/credentials` file but these are not recommended!
-
-**Google Cloud Specific**
-
-* Gcloud credentials are automatically inferred by the SDK through the standard environment variables, installed credentials on the host, or via server roles.  See https://cloud.google.com/docs/authentication/production for more information on injecting credentials in the app (normally set `GOOGLE_APPLICATION_CREDENTIALS` to the path of your credentials (in json format). Ensure the credentials used have access to SQL administration.
-* `GCLOUD_PROJECT_ID` - The google project id to use.
-* `GCLOUD_REGION` - The google region used for this broker.
-
-**Shared Postgres Provider Specific**
-
-There are no environment variables for shared postgres providers, although sensitive configuration can be set in the enivornment, see [docs/PLANS.md](plans) for more information. 
-
-**Shared Mysql Provider Specific**
-
-There are no environment variables for shared postgres providers, although sensitive configuration can be set in the enivornment, see [docs/PLANS.md](plans) for more information. 
 
 **Optional**
 
@@ -69,7 +51,7 @@ There are no environment variables for shared postgres providers, although sensi
 
 ### 2. Deployment
 
-You can deploy the image `akkeris/elasticache-broker:lastest` via docker with the environment or config var settings above. If you decide you're going to build this manually and run it you'll need see the Building section below. 
+You can deploy the image `akkeris/elasticache-broker:latest` via docker with the environment or config var settings above. If you decide you're going to build this manually and run it you'll need see the Building section below. 
 
 ### 3. Plans
 

@@ -40,8 +40,8 @@ type Provider interface {
 	Restart(*Instance) error
 	PerformPostProvision(*Instance) (*Instance, error)
 	GetUrl(*Instance) map[string]interface{}
-	Flush(Instance *instance) error
-	Stats(Instance *instance) ([]Stat, error)
+	Flush(*Instance) error
+	Stats(*Instance) ([]Stat, error)
 }
 
 func GetProviderByPlan(namePrefix string, plan *ProviderPlan) (Provider, error) {
