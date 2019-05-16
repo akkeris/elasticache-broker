@@ -1,10 +1,10 @@
-FROM golang:1.10-alpine
+FROM golang:1.12-alpine
+ENV GO111MODULE=on
 RUN apk update
 RUN apk add openssl ca-certificates git make build-base postgresql
 RUN wget https://github.com/golang/dep/releases/download/v0.5.0/dep-linux-amd64 -O /usr/bin/dep
 RUN chmod +x /usr/bin/dep
 WORKDIR /go/src/github.com/akkeris/elasticache-broker
 COPY . .
-RUN dep ensure
 RUN make
 CMD ./servicebroker -insecure -logtostderr=1 -stderrthreshold 0 

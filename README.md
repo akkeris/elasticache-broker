@@ -71,16 +71,12 @@ You can optionally pass in the startup options `-logtostderr=1 -stderrthreshold 
 
 ## Contributing and Building
 
-1. `dep ensure`
+1. `export GO111MODULE=on`
 2. `make`
 3. `./servicebroker ...`
 
 ### Testing
 
-`make test`
-
-1. To run the aws instance and cluster tests `TEST_AWS_CLUSTER` and `TEST_AWS_INSTANCE` must be set to true.
-2. To run the shared postgres tests set `TEST_SHARED_POSTGRES` to true (the `DATABASE_URL` will be used as the shared tenant!)
-3. To run the mysql postgres test set `MYSQL_URL` and `TEST_SHARED_MYSQL` to true.
+Working on it...
 
 
