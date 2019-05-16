@@ -1,0 +1,48 @@
+version: 2
+jobs:
+  build:
+    working_directory: /app
+    docker:
+      - image: golang:1.11-alpine
+      - image: circleci/postgres:9.6.2-alpine
+        environment:
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: test
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Run tests
+          command: |
+            apk update --no-progress -q
+            apk add openssl ca-certificates git make build-base nodejs npm docker --no-progress -q
+            wget https://github.com/golang/dep/releases/download/v0.5.0/dep-linux-amd64 -q -O /usr/bin/dep
+            chmod +x /usr/bin/dep
+            mkdir -p /go/src/github.com/akkeris/
+            cp -a -p . /go/src/github.com/akkeris/elasticache-broker
+            cd /go/src/github.com/akkeris/elasticache-broker
+            dep ensure
+            DATABASE_URL=postgres://root:root@localhost:5432/test\?sslmode=disable NAME_PREFIX=testing make coverage
+            go get github.com/schrej/godacov
+            godacov -t $CODACY_PROJECT_TOKEN -r ./cover.out -c ${CIRCLE_SHA1}
+      - run:
+          name: Build application docker image
+          command: |
+            docker build -t elasticache-broker .
+      - deploy:
+          name: Push application Docker image
+          command: |
+            if [ "${CIRCLE_BRANCH}" != "release" ]; then
+              if [ "${CIRCLE_PROJECT_USERNAME}" == "akkeris" ]; then 
+                docker login -u $DOCKER_LOGIN -p $DOCKER_PASS
+                docker tag elasticache-broker "docker.io/akkeris/elasticache-broker:${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}"
+                docker push "docker.io/akkeris/elasticache-broker:${CIRCLE_BRANCH}-${CIRCLE_BUILD_NUM}"
+                if [ "${CIRCLE_BRANCH}" == "master" ]; then
+                  docker tag elasticache-broker "docker.io/akkeris/elasticache-broker:release-${CIRCLE_BUILD_NUM}"
+                  docker tag elasticache-broker "docker.io/akkeris/elasticache-broker:latest"
+                  docker push "docker.io/akkeris/elasticache-broker:latest"
+                  docker push "docker.io/akkeris/elasticache-broker:release-${CIRCLE_BUILD_NUM}"
+                fi
+              fi
+            fi
