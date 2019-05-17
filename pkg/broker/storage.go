@@ -226,7 +226,7 @@ begin
 
         -- memcached
         insert into plans 
-            (plan, service, name, human_name, description, version, type, scheme, categories, cost_cents, preprovision, attributes, provider, provider_private_details)
+            (plan, service, name, human_name, description, version, type, scheme, categories, cost_cents, preprovision, attributes, provider, provider_private_details, deprecated)
         values 
             -- deprecated previous plans
             ('11b8e0b0-429a-4fa8-92a0-e60d9e781caa', '8cccbf79-3e08-4607-ad9f-193bd5f7ff83', 'small',       'Small (1.5)',          'Memcached 1.5 - 1xCPU 512MB Ram', '1.5', 'memcached', 'memcached', 'Data Stores', 1500,     0, '{"ram":"512MB",  "cpu":"1xCPU",  "restartable":true, "data_clips":false, "connection_limit":20,   "shards":0, "high_availability":false, "rollback":"none", "encryption_at_rest":false, "dedicated":true }', 'aws-memcached-instance', '{"AZMode":null,"AuthToken":null,"AutoMinorVersionUpgrade":true,"CacheClusterId":null,"CacheNodeType":"cache.t2.micro", "CacheParameterGroupName":"default.memcached1.5","CacheSecurityGroupNames":null,"CacheSubnetGroupName":"${MEMCACHED_SUBNET_GROUP}","Engine":"memcached","EngineVersion":"1.5.10","NotificationTopicArn":null,"NumCacheNodes":1,"Port":6379,"PreferredAvailabilityZone":null,"PreferredAvailabilityZones":null,"PreferredMaintenanceWindow":null,"ReplicationGroupId":null,"SecurityGroupIds":["${ELASTICACHE_SECURITY_GROUP}"],"SnapshotArns":null,"SnapshotName":null,"SnapshotRetentionLimit":null,"SnapshotWindow":null,"Tags":null}', true),
