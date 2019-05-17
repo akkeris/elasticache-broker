@@ -80,7 +80,7 @@ func (provider AWSInstanceMemcachedProvider) PerformPostProvision(db *Instance) 
 
 func (provider AWSInstanceMemcachedProvider) GetUrl(instance *Instance) map[string]interface{} {
 	return map[string]interface{}{
-		"MEMCACHED_URL":instance.Scheme + "://" + instance.Endpoint,
+		"MEMCACHED_URL":instance.Endpoint,
 	}
 }
 
