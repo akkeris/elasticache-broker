@@ -51,6 +51,15 @@ type ResourceSpec struct {
 	Name string `json:"name"`
 }
 
+type BackupSpec struct {
+	Resource ResourceSpec `json:"resource"`
+	Id       *string      `json:"id"`
+	Progress *int64       `json:"progress"`
+	Status   *string      `json:"status"`
+	Created  string       `json:"created_at"`
+}
+
+
 func IsAvailable(status string) bool {
 	return status == "available" ||
 			// gcloud status

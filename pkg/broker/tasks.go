@@ -24,7 +24,7 @@ const (
 	NotifyCreateBindingWebhookTask       TaskAction = "notify-create-binding-webhook"
 	ChangeProvidersTask					 TaskAction = "change-providers"
 	ChangePlansTask						 TaskAction = "change-plans"
-	RestoreDbTask						 TaskAction = "restore-database"
+	RestoreTask						 	 TaskAction = "restore"
 	PerformPostProvisionTask			 TaskAction = "perform-post-provision"
 )
 
@@ -53,7 +53,7 @@ type ChangePlansTaskMetadata struct {
 	Plan string `json:"plan"`
 }
 
-type RestoreDbTaskMetadata struct {
+type RestoreTaskMetadata struct {
 	Backup string `json:"backup"`
 }
 
@@ -172,6 +172,21 @@ func UpgradeWithinProviders(storage Storage, fromDb *Instance, toPlanId string, 
 func UpgradeAcrossProviders(storage Storage, fromDb *Instance, toPlanId string, namePrefix string) (string, error) {
 	return "", errors.New("Memcached and redis instances cannot be upgraded across providers.")
 }
+
+
+func RestoreBackup(storage Storage, instance *Instance, namePrefix string, backup string) error {
+	provider, err := GetProviderByPlan(namePrefix, instance.Plan)
+	if err != nil {
+		glog.Errorf("Unable to restore backup, cannot find provider (GetProviderByPlan failed): %s\n", err.Error())
+		return err
+	}
+	if err = provider.RestoreBackup(instance, backup); err != nil {
+		glog.Errorf("Unable to restore backup: %s\n", err.Error())
+		return err
+	}
+	return nil
+}
+
 
 func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage Storage) error {
 
@@ -437,8 +452,34 @@ func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage S
 			}
 
 			FinishedTask(storage, task.Id, task.Retries, output, "finished")
+		} else if task.Action == RestoreTask {
+			glog.Infof("Restoring database for: %s\n", task.Id)
+			if task.Retries >= 60 {
+				glog.Infof("Retry limit was reached for task: %s %d\n", task.Id, task.Retries)
+				FinishedTask(storage, task.Id, task.Retries, "Unable to restore database "+task.ResourceId+" as it failed multiple times ("+task.Result+")", "failed")
+				continue
+			}
+			instance, err := GetInstanceById(namePrefix, storage, task.ResourceId)
+			if err != nil {
+				glog.Infof("Failed to get provider instance for task: %s, %s\n", task.Id, err.Error())
+				UpdateTaskStatus(storage, task.Id, task.Retries, "Cannot get instance: "+err.Error(), "pending")
+				continue
+			}
+			var taskMetaData RestoreTaskMetadata
+			err = json.Unmarshal([]byte(task.Metadata), &taskMetaData)
+			if err != nil {
+				glog.Infof("Cannot unmarshal task metadata to restore databases: %s, %s\n", task.Id, err.Error())
+				UpdateTaskStatus(storage, task.Id, task.Retries, "Cannot unmarshal task metadata to restore databases: "+err.Error(), "pending")
+				continue
+			}
+			if err = RestoreBackup(storage, instance, namePrefix, taskMetaData.Backup); err != nil {
+				glog.Infof("Cannot restore backups for: %s, %s\n", task.Id, err.Error())
+				UpdateTaskStatus(storage, task.Id, task.Retries, "Cannot restore backup: "+err.Error(), "pending")
+				continue
+			}
+
+			FinishedTask(storage, task.Id, task.Retries, "", "finished")
 		}
-		// TODO: create binding NotifyCreateBindingWebhookTask
 
 		glog.Infof("Finished task: %s\n", task.Id)
 	}

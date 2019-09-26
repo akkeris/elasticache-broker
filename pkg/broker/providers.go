@@ -42,6 +42,11 @@ type Provider interface {
 	GetUrl(*Instance) map[string]interface{}
 	Flush(*Instance) error
 	Stats(*Instance) ([]Stat, error)
+
+	GetBackup(*Instance, string) (*BackupSpec, error)
+	ListBackups(*Instance) ([]BackupSpec, error)
+	CreateBackup(*Instance) (*BackupSpec, error)
+	RestoreBackup(*Instance, string) error
 }
 
 func GetProviderByPlan(namePrefix string, plan *ProviderPlan) (Provider, error) {
