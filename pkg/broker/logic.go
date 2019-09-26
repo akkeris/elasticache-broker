@@ -26,10 +26,102 @@ func NewBusinessLogic(ctx context.Context, o Options) (*BusinessLogic, error) {
 		namePrefix: namePrefix,
 	}
 
+	bl.AddActions("list_backups", "backups", "GET", bl.ActionListBackups)
+	bl.AddActions("get_backup", "backups/{backup}", "GET", bl.ActionGetBackup)
+	bl.AddActions("create_backup", "backups", "POST", bl.ActionCreateBackup)
+	bl.AddActions("restore_backup", "backups/{backup}", "PUT", bl.ActionRestoreBackup)
+
 	bl.AddActions("flush", "flush", "POST", bl.ActionFlushData)
 	bl.AddActions("stats", "stats", "POST", bl.ActionGetStats)
 	bl.AddActions("restart", "restart", "POST", bl.ActionRestart)
 	return &bl, nil
+}
+
+
+func (b *BusinessLogic) ActionRestoreBackup(InstanceID string, vars map[string]string, context *broker.RequestContext) (interface{}, error) {
+	instance, err := b.GetInstanceById(InstanceID)
+	if err != nil {
+		return nil, NotFound()
+	}
+	provider, err := GetProviderByPlan(b.namePrefix, instance.Plan)
+	if err != nil {
+		glog.Errorf("Unable to restore backups, cannot find provider (GetProviderByPlan failed): %s\n", err.Error())
+		return nil, InternalServerError()
+	}
+	_, err = provider.GetBackup(instance, vars["backup"])
+	if err != nil {
+		glog.Errorf("Unable to find backup to restore: %s: %s\n", vars["backup"], err.Error())
+		return nil, NotFound()
+	}
+	byteData, err := json.Marshal(RestoreTaskMetadata{Backup: vars["backup"]})
+	if err != nil {
+		glog.Errorf("Error: failed to marshal webhook task metadata: %s\n", err)
+		return nil, InternalServerError()
+	}
+	if _, err = b.storage.AddTask(instance.Id, RestoreTask, string(byteData)); err != nil {
+		glog.Errorf("Error: Unable to schedule restore backup! (%s): %s\n", instance.Name, err.Error())
+		return nil, InternalServerError()
+	}
+	return map[string]interface{}{"status": "OK"}, nil
+}
+
+func (b *BusinessLogic) ActionCreateBackup(InstanceID string, vars map[string]string, context *broker.RequestContext) (interface{}, error) {
+	instance, err := b.GetInstanceById(InstanceID)
+	if err != nil {
+		return nil, NotFound()
+	}
+	if !CanBeModified(instance.Status) {
+		return nil, UnprocessableEntityWithMessage("ServiceNotYetAvailable", "A backup cannot be created while this service is under maintenance.")
+	}
+	provider, err := GetProviderByPlan(b.namePrefix, instance.Plan)
+	if err != nil {
+		glog.Errorf("Unable to create backup, cannot find provider (GetProviderByPlan failed): %s\n", err.Error())
+		return nil, InternalServerError()
+	}
+	backup, err := provider.CreateBackup(instance)
+	if err != nil {
+		glog.Errorf("Unable to create backup, create backup failed: %s\n", err.Error())
+		return nil, InternalServerError()
+	}
+	return backup, nil
+}
+
+func (b *BusinessLogic) ActionListBackups(InstanceID string, vars map[string]string, context *broker.RequestContext) (interface{}, error) {
+	instance, err := b.GetInstanceById(InstanceID)
+	if err != nil {
+		return nil, NotFound()
+	}
+	provider, err := GetProviderByPlan(b.namePrefix, instance.Plan)
+	if err != nil {
+		glog.Errorf("Unable to list backups, cannot find provider (GetProviderByPlan failed): %s\n", err.Error())
+		return nil, InternalServerError()
+	}
+	backups, err := provider.ListBackups(instance)
+	if err != nil {
+		glog.Errorf("Unable to list backups, create backup failed: %s\n", err.Error())
+		return nil, InternalServerError()
+	}
+	return backups, nil
+}
+
+func (b *BusinessLogic) ActionGetBackup(InstanceID string, vars map[string]string, context *broker.RequestContext) (interface{}, error) {
+	instance, err := b.GetInstanceById(InstanceID)
+	if err != nil {
+		return nil, NotFound()
+	}
+	provider, err := GetProviderByPlan(b.namePrefix, instance.Plan)
+	if err != nil {
+		glog.Errorf("Unable to create backup, cannot find provider (GetProviderByPlan failed): %s\n", err.Error())
+		return nil, InternalServerError()
+	}
+	backup, err := provider.GetBackup(instance, vars["backup"])
+	if err != nil && err.Error() == "Not found" {
+		return nil, NotFound()
+	} else if err != nil {
+		glog.Errorf("Unable to get backup, get backup failed: %s\n", err.Error())
+		return nil, InternalServerError()
+	}
+	return backup, nil
 }
 
 func (b *BusinessLogic) GetCatalog(c *broker.RequestContext) (*broker.CatalogResponse, error) {

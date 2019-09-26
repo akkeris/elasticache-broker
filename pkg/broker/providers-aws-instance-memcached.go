@@ -252,3 +252,20 @@ func (provider AWSInstanceMemcachedProvider) Stats(Instance *Instance) ([]Stat, 
 	}
 	return stats, nil
 }
+
+
+func (provider AWSInstanceMemcachedProvider) GetBackup(*Instance, string) (*BackupSpec, error) {
+	return nil, errors.New("Backups are unavailable on a memcached")
+}
+
+func (provider AWSInstanceMemcachedProvider) ListBackups(*Instance) ([]BackupSpec, error) {
+	return nil, errors.New("Backups are unavailable on a memcached")
+}
+
+func (provider AWSInstanceMemcachedProvider) CreateBackup(*Instance) (*BackupSpec, error) {
+	return nil, errors.New("Backups are unavailable on a memcached")
+}
+
+func (provider AWSInstanceMemcachedProvider) RestoreBackup(*Instance, string) error {
+	return errors.New("Backups are unavailable on a memcached")
+}
