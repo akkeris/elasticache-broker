@@ -8,7 +8,7 @@ require (
 	github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e // indirect
 	github.com/evanphx/json-patch v0.0.0-20190203023257-5858425f7550 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
-	github.com/go-redis/redis v6.15.5+incompatible
+	github.com/go-redis/redis v6.15.7+incompatible
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903 // indirect
 	github.com/google/btree v1.0.0 // indirect
