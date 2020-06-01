@@ -23,7 +23,7 @@ require (
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/juju/ratelimit v1.0.1 // indirect
 	github.com/kubernetes/client-go v6.0.0+incompatible // indirect
-	github.com/lib/pq v1.2.0
+	github.com/lib/pq v1.6.0
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/onsi/gomega v0.0.0-20190113212917-5533ce8a0da3 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
@@ -33,7 +33,6 @@ require (
 	github.com/shawn-hurley/osb-broker-k8s-lib v0.0.0-20180430125558-bed19ac36ffe
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/stackimpact/stackimpact-go v2.3.10+incompatible
-	golang.org/x/crypto v0.0.0-20190513172903-22d7a77e9e5f // indirect
 	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a // indirect
 	golang.org/x/text v0.3.2 // indirect
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
