@@ -3,7 +3,7 @@ module github.com/akkeris/elasticache-broker
 go 1.12
 
 require (
-	github.com/aws/aws-sdk-go v1.25.2
+	github.com/aws/aws-sdk-go v1.33.16
 	github.com/docker/spdystream v0.0.0-20160310174837-449fdfce4d96 // indirect
 	github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e // indirect
 	github.com/evanphx/json-patch v0.0.0-20190203023257-5858425f7550 // indirect
@@ -16,14 +16,14 @@ require (
 	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf // indirect
 	github.com/google/uuid v1.0.0 // indirect
 	github.com/googleapis/gnostic v0.2.0 // indirect
-	github.com/gorilla/mux v1.7.3
+	github.com/gorilla/mux v1.7.4
 	github.com/gregjones/httpcache v0.0.0-20190212212710-3befbb6ad0cc // indirect
 	github.com/hashicorp/golang-lru v0.5.0 // indirect
 	github.com/howeyc/gopass v0.0.0-20170109162249-bf9dde6d0d2c // indirect
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/juju/ratelimit v1.0.1 // indirect
 	github.com/kubernetes/client-go v6.0.0+incompatible // indirect
-	github.com/lib/pq v1.2.0
+	github.com/lib/pq v1.8.0
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/onsi/gomega v0.0.0-20190113212917-5533ce8a0da3 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
