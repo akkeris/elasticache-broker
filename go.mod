@@ -38,8 +38,8 @@ require (
 	golang.org/x/text v0.3.2 // indirect
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
 	gopkg.in/inf.v0 v0.9.0 // indirect
-	k8s.io/api v0.0.0-20190503184017-f1b257a4ce96 // indirect
-	k8s.io/apimachinery v0.0.0-20180621070125-103fd098999d // indirect
+	k8s.io/api v0.0.0-20190503184017-f1b257a4ce96
+	k8s.io/apimachinery v0.0.0-20180621070125-103fd098999d
 	k8s.io/client-go v0.0.0-20190503184104-3ec0d5188431
 	k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30 // indirect
 	k8s.io/utils v0.0.0-20190506122338-8fab8cb257d5 // indirect

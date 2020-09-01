@@ -44,6 +44,12 @@ Note almost all of these can be set via the command line as well.
 
 Note that you can get away with not setting `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` and use EC2 IAM roles or hard coded credentials via the `~/.aws/credentials` file but these are not recommended!
 
+**Kubernetes Provider Specfic**
+
+* `USE_KUBERNETES` - must be set to `true` to use kubernetes
+
+In addition, the namespace `memcached-system` must be created with a service account to create, update and delete servces/deployments/pods in this namespace attached to the deployment of the elasticache broker.
+
 **Optional**
 
 * `PORT` - This defaults to 8443, setting this changes the default port number to listen to http (or https) traffic on

@@ -2,15 +2,17 @@ package broker
 
 import (
 	"errors"
+	"os"
 	osb "github.com/pmorie/go-open-service-broker-client/v2"
 )
 
 type Providers string
 
 const (
-	AWSRedisInstance   		Providers = "aws-redis-instance"
-	AWSMemcachedInstance    Providers = "aws-memcached-instance"
-	Unknown        			Providers = "unknown"
+	AWSRedisInstance   			Providers = "aws-redis-instance"
+	AWSMemcachedInstance    	Providers = "aws-memcached-instance"
+	KubernetesMemcachedInstance Providers = "kubernetes-memcached-instance"
+	Unknown        				Providers = "unknown"
 )
 
 func GetProvidersFromString(str string) Providers {
@@ -18,6 +20,8 @@ func GetProvidersFromString(str string) Providers {
 		return AWSRedisInstance
 	} else if str == "aws-memcached-instance" {
 		return AWSMemcachedInstance
+	} else if str == "kubernetes-memcached-instance" {
+		return KubernetesMemcachedInstance
 	}
 	return Unknown
 }
@@ -54,6 +58,8 @@ func GetProviderByPlan(namePrefix string, plan *ProviderPlan) (Provider, error) 
 		return NewAWSInstanceRedisProvider(namePrefix)
 	} else if plan.Provider == AWSMemcachedInstance {
 		return NewAWSInstanceMemcachedProvider(namePrefix)
+	} else if plan.Provider == KubernetesMemcachedInstance && os.Getenv("USE_KUBERNETES") == "true" {
+		return NewKubernetesInstanceMemcachedProvider(namePrefix)
 	} else {
 		return nil, errors.New("Unable to find provider for plan.")
 	}

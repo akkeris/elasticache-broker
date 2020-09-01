@@ -398,7 +398,7 @@ func (b *BusinessLogic) Update(request *osb.UpdateInstanceRequest, c *broker.Req
 		return nil, err
 	}
 
-	if Instance.Plan.Provider == target_plan.Provider {
+	if (Instance.Plan.Provider == target_plan.Provider) || (Instance.Plan.Provider != target_plan.Provider && Instance.Engine == "memcached") {
 		byteData, err := json.Marshal(ChangePlansTaskMetadata{Plan:*request.PlanID})
 		if err != nil {
 			glog.Errorf("Unable to marshal change plans task meta data: %s\n", err.Error())
@@ -411,7 +411,7 @@ func (b *BusinessLogic) Update(request *osb.UpdateInstanceRequest, c *broker.Req
 		response.Async = true
 		return &response, nil
 	} else {
-		return nil, UnprocessableEntityWithMessage("UpgradeError", "Cannot upgrade or change plans across provider types.")
+		return nil, UnprocessableEntityWithMessage("UpgradeError", "Cannot upgrade or change redis plans across provider types.")
 	}
 }
 
