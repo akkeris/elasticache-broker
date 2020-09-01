@@ -144,7 +144,7 @@ func UpgradeWithinProviders(storage Storage, fromDb *Instance, toPlanId string, 
 		return "", errors.New("Cannot upgrade to the same plan")
 	}
 	if toPlan.Provider != fromDb.Plan.Provider {
-		return "", errors.New("Unable to upgrade, different providers were passed in on both plans")
+		return UpgradeAcrossProviders(storage, fromDb, toPlanId, namePrefix)
 	}
 
 	// This could take a very long time.
@@ -169,8 +169,49 @@ func UpgradeWithinProviders(storage Storage, fromDb *Instance, toPlanId string, 
 	return "", err
 }
 
-func UpgradeAcrossProviders(storage Storage, fromDb *Instance, toPlanId string, namePrefix string) (string, error) {
-	return "", errors.New("Memcached and redis instances cannot be upgraded across providers.")
+func UpgradeAcrossProviders(storage Storage, from *Instance, toPlanId string, namePrefix string) (string, error) {
+	if from == nil {
+		return "", errors.New("Instance from was nil, cannot upgrade across providers with no from resource.")
+	}
+	if from.Engine != "memcached" {
+		return "", errors.New("Redis instances cannot be upgraded across providers.")
+	}
+	toPlan, err := storage.GetPlanByID(toPlanId)
+	if err != nil {
+		return "", err
+	}
+	fromProvider, err := GetProviderByPlan(namePrefix, from.Plan)
+	if err != nil {
+		return "", err
+	}
+	toProvider, err := GetProviderByPlan(namePrefix, toPlan)
+	if err != nil {
+		return "", err
+	}
+
+	// Memcached is holds no state, create the new one, remove the old one, update the db with the same id.
+	newInstance, err := toProvider.Provision(from.Id, toPlan, "")
+	if err != nil {
+		return "", err
+	}
+	if err = fromProvider.Deprovision(from, true); err != nil {
+		glog.Errorf("ERROR: Unable to deprovision old instance, attempting to remove potential orphan %#+v\n", newInstance)
+		if err2 := toProvider.Deprovision(newInstance, true); err2 != nil {
+			glog.Errorf("ERROR FATAL: We could not deprovision the orphaned database, we're now leaking memcached instances! %#+v\n", newInstance)
+		}
+		return "", err
+	}
+	if err = storage.UpdateInstance(newInstance, toPlan.ID); err != nil {
+		glog.Errorf("ERROR: Cannot update instance of memcached after upgrade change %s (to plan: %s) %s\n", from.Name, from.Plan.ID, err.Error())
+		return "", err
+	}
+
+	if !IsAvailable(newInstance.Status) {
+		if _, err = storage.AddTask(newInstance.Id, ResyncFromProviderTask, ""); err != nil {
+			glog.Errorf("Error: Unable to schedule resync from provider! (%s): %s\n", newInstance.Name, err.Error())
+		}
+	}
+	return "", err
 }
 
 
