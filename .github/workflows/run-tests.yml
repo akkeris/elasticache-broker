@@ -19,6 +19,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
       - name: Run tests
-        run: make test
+        run: make coverage
         env:
           DATABASE_URL: postgres://postgres:password@localhost:5432/postgres?sslmode=disable
+          NAME_PREFIX: test
+      - name: Report Coverage
+        run: |
+          go get github.com/schrej/godacov
+          godacov -t ${{ secrets.CODACY_PROJECT_TOKEN }} -r ./cover.out -c ${GITHUB_SHA}
