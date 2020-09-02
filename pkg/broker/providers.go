@@ -2,17 +2,17 @@ package broker
 
 import (
 	"errors"
-	"os"
 	osb "github.com/pmorie/go-open-service-broker-client/v2"
+	"os"
 )
 
 type Providers string
 
 const (
-	AWSRedisInstance   			Providers = "aws-redis-instance"
-	AWSMemcachedInstance    	Providers = "aws-memcached-instance"
+	AWSRedisInstance            Providers = "aws-redis-instance"
+	AWSMemcachedInstance        Providers = "aws-memcached-instance"
 	KubernetesMemcachedInstance Providers = "kubernetes-memcached-instance"
-	Unknown        				Providers = "unknown"
+	Unknown                     Providers = "unknown"
 )
 
 func GetProvidersFromString(str string) Providers {

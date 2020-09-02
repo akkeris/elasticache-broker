@@ -13,10 +13,10 @@ import (
 	"github.com/golang/glog"
 	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/shawn-hurley/osb-broker-k8s-lib/middleware"
+	"github.com/stackimpact/stackimpact-go"
 	clientset "k8s.io/client-go/kubernetes"
 	clientrest "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"github.com/stackimpact/stackimpact-go"
 
 	"github.com/akkeris/elasticache-broker/pkg/broker"
 	"github.com/pmorie/osb-broker-lib/pkg/metrics"

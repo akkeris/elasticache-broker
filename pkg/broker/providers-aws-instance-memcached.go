@@ -6,19 +6,19 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elasticache"
+	"io/ioutil"
+	"net"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-	"net"
-	"io/ioutil"
 )
 
 type AWSInstanceMemcachedProvider struct {
 	Provider
-	awssvc              *elasticache.ElastiCache
-	namePrefix          string
-	instanceCache 		map[string]*Instance
+	awssvc        *elasticache.ElastiCache
+	namePrefix    string
+	instanceCache map[string]*Instance
 }
 
 func NewAWSInstanceMemcachedProvider(namePrefix string) (*AWSInstanceMemcachedProvider, error) {
@@ -27,9 +27,9 @@ func NewAWSInstanceMemcachedProvider(namePrefix string) (*AWSInstanceMemcachedPr
 	}
 	t := time.NewTicker(time.Second * 5)
 	AWSInstanceMemcachedProvider := &AWSInstanceMemcachedProvider{
-		namePrefix:          namePrefix,
-		instanceCache:		 make(map[string]*Instance),
-		awssvc:              elasticache.New(session.New(&aws.Config{Region: aws.String(os.Getenv("AWS_REGION"))})),
+		namePrefix:    namePrefix,
+		instanceCache: make(map[string]*Instance),
+		awssvc:        elasticache.New(session.New(&aws.Config{Region: aws.String(os.Getenv("AWS_REGION"))})),
 	}
 	go (func() {
 		for {
@@ -41,13 +41,13 @@ func NewAWSInstanceMemcachedProvider(namePrefix string) (*AWSInstanceMemcachedPr
 }
 
 func (provider AWSInstanceMemcachedProvider) GetInstance(name string, plan *ProviderPlan) (*Instance, error) {
-	if provider.instanceCache[name + plan.ID] != nil {
-		return provider.instanceCache[name + plan.ID], nil
+	if provider.instanceCache[name+plan.ID] != nil {
+		return provider.instanceCache[name+plan.ID], nil
 	}
 	resp, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
-		CacheClusterId: 	aws.String(name),
-		MaxRecords: 		aws.Int64(20),
-		ShowCacheNodeInfo: 	aws.Bool(true),
+		CacheClusterId:    aws.String(name),
+		MaxRecords:        aws.Int64(20),
+		ShowCacheNodeInfo: aws.Bool(true),
 	})
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (provider AWSInstanceMemcachedProvider) GetInstance(name string, plan *Prov
 	if len(resp.CacheClusters) > 0 && len(resp.CacheClusters[0].CacheNodes) > 0 && resp.CacheClusters[0].CacheNodes[0].Endpoint != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Port != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Address != nil {
 		endpoint = *resp.CacheClusters[0].CacheNodes[0].Endpoint.Address + ":" + strconv.FormatInt(*resp.CacheClusters[0].CacheNodes[0].Endpoint.Port, 10)
 	}
-	provider.instanceCache[name + plan.ID] = &Instance{
+	provider.instanceCache[name+plan.ID] = &Instance{
 		Id:            "", // providers should not store this.
 		ProviderId:    *resp.CacheClusters[0].CacheClusterId,
 		Name:          name,
@@ -71,7 +71,7 @@ func (provider AWSInstanceMemcachedProvider) GetInstance(name string, plan *Prov
 		Scheme:        plan.Scheme,
 	}
 
-	return provider.instanceCache[name + plan.ID], nil
+	return provider.instanceCache[name+plan.ID], nil
 }
 
 func (provider AWSInstanceMemcachedProvider) PerformPostProvision(db *Instance) (*Instance, error) {
@@ -80,7 +80,7 @@ func (provider AWSInstanceMemcachedProvider) PerformPostProvision(db *Instance) 
 
 func (provider AWSInstanceMemcachedProvider) GetUrl(instance *Instance) map[string]interface{} {
 	return map[string]interface{}{
-		"MEMCACHED_URL":instance.Endpoint,
+		"MEMCACHED_URL": instance.Endpoint,
 	}
 }
 
@@ -111,7 +111,6 @@ func (provider AWSInstanceMemcachedProvider) ProvisionWithSettings(Id string, pl
 	}, nil
 }
 
-
 func (provider AWSInstanceMemcachedProvider) Provision(Id string, plan *ProviderPlan, Owner string) (*Instance, error) {
 	var settings elasticache.CreateCacheClusterInput
 	if err := json.Unmarshal([]byte(plan.providerPrivateDetails), &settings); err != nil {
@@ -132,7 +131,7 @@ func (provider AWSInstanceMemcachedProvider) Deprovision(Instance *Instance, tak
 
 func (provider AWSInstanceMemcachedProvider) Modify(Instance *Instance, plan *ProviderPlan) (*Instance, error) {
 	// Memcached cannot be upgraded really, only a few trivial parameters can be
-	// changed, so we'll nuke the old instance, wait for it to die, then create a 
+	// changed, so we'll nuke the old instance, wait for it to die, then create a
 	// new instance with the same identifier.
 	if !CanBeModified(Instance.Status) {
 		return nil, errors.New("Databases cannot be modifed during backups, upgrades or while maintenance is being performed.")
@@ -145,9 +144,9 @@ func (provider AWSInstanceMemcachedProvider) Modify(Instance *Instance, plan *Pr
 		return nil, err
 	}
 	provider.awssvc.WaitUntilCacheClusterDeleted(&elasticache.DescribeCacheClustersInput{
-		CacheClusterId: aws.String(Instance.ProviderId),
-		MaxRecords: 		aws.Int64(20),
-		ShowCacheNodeInfo: 	aws.Bool(true),
+		CacheClusterId:    aws.String(Instance.ProviderId),
+		MaxRecords:        aws.Int64(20),
+		ShowCacheNodeInfo: aws.Bool(true),
 	})
 	settings.CacheClusterId = aws.String(Instance.ProviderId)
 	return provider.ProvisionWithSettings(Instance.Id, plan, &settings)
@@ -183,9 +182,9 @@ func (provider AWSInstanceMemcachedProvider) Restart(Instance *Instance) error {
 		return errors.New("Cannot restart a database that is unavailable.")
 	}
 	res, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
-		CacheClusterId: 	aws.String(Instance.ProviderId),
-		MaxRecords: 		aws.Int64(20),
-		ShowCacheNodeInfo: 	aws.Bool(true),
+		CacheClusterId:    aws.String(Instance.ProviderId),
+		MaxRecords:        aws.Int64(20),
+		ShowCacheNodeInfo: aws.Bool(true),
 	})
 	if err != nil {
 		return err
@@ -198,7 +197,7 @@ func (provider AWSInstanceMemcachedProvider) Restart(Instance *Instance) error {
 		nodes = append(nodes, node.CacheNodeId)
 	}
 	_, err = provider.awssvc.RebootCacheCluster(&elasticache.RebootCacheClusterInput{
-		CacheClusterId: aws.String(Instance.ProviderId),
+		CacheClusterId:       aws.String(Instance.ProviderId),
 		CacheNodeIdsToReboot: nodes,
 	})
 	return err
@@ -245,14 +244,13 @@ func (provider AWSInstanceMemcachedProvider) Stats(Instance *Instance) ([]Stat, 
 		if strings.HasPrefix(element, "STAT") {
 			stat := strings.Split(element, " ")
 			stats = append(stats, Stat{
-				Key:stat[1],
-				Value:strings.TrimSpace(stat[2]),
+				Key:   stat[1],
+				Value: strings.TrimSpace(stat[2]),
 			})
 		}
 	}
 	return stats, nil
 }
-
 
 func (provider AWSInstanceMemcachedProvider) GetBackup(*Instance, string) (*BackupSpec, error) {
 	return nil, errors.New("Backups are unavailable on a memcached")

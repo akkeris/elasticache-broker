@@ -22,10 +22,10 @@ const (
 	ResyncFromProviderUntilAvailableTask TaskAction = "resync-until-available"
 	NotifyCreateServiceWebhookTask       TaskAction = "notify-create-service-webhook"
 	NotifyCreateBindingWebhookTask       TaskAction = "notify-create-binding-webhook"
-	ChangeProvidersTask					 TaskAction = "change-providers"
-	ChangePlansTask						 TaskAction = "change-plans"
-	RestoreTask						 	 TaskAction = "restore"
-	PerformPostProvisionTask			 TaskAction = "perform-post-provision"
+	ChangeProvidersTask                  TaskAction = "change-providers"
+	ChangePlansTask                      TaskAction = "change-plans"
+	RestoreTask                          TaskAction = "restore"
+	PerformPostProvisionTask             TaskAction = "perform-post-provision"
 )
 
 type Task struct {
@@ -214,7 +214,6 @@ func UpgradeAcrossProviders(storage Storage, from *Instance, toPlanId string, na
 	return "", err
 }
 
-
 func RestoreBackup(storage Storage, instance *Instance, namePrefix string, backup string) error {
 	provider, err := GetProviderByPlan(namePrefix, instance.Plan)
 	if err != nil {
@@ -227,7 +226,6 @@ func RestoreBackup(storage Storage, instance *Instance, namePrefix string, backu
 	}
 	return nil
 }
-
 
 func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage Storage) error {
 
@@ -326,7 +324,7 @@ func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage S
 			}
 			if !IsAvailable(Instance.Status) {
 				glog.Infof("Status did not change at provider for task: %s\n", task.Id)
-				UpdateTaskStatus(storage, task.Id, task.Retries+1, "No change in status since last check (" + Instance.Status + ")", "pending")
+				UpdateTaskStatus(storage, task.Id, task.Retries+1, "No change in status since last check ("+Instance.Status+")", "pending")
 				continue
 			}
 			FinishedTask(storage, task.Id, task.Retries, "", "finished")
@@ -349,19 +347,19 @@ func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage S
 			}
 			if !IsAvailable(Instance.Status) {
 				glog.Infof("Status did not change at provider for task: %s\n", task.Id)
-				UpdateTaskStatus(storage, task.Id, task.Retries+1, "No change in status since last check (" + Instance.Status + ")", "pending")
+				UpdateTaskStatus(storage, task.Id, task.Retries+1, "No change in status since last check ("+Instance.Status+")", "pending")
 				continue
 			}
 
 			provider, err := GetProviderByPlan(namePrefix, Instance.Plan)
 			if err != nil {
-				UpdateTaskStatus(storage, task.Id, task.Retries, "Cannot get provider: " + err.Error(), "pending")
+				UpdateTaskStatus(storage, task.Id, task.Retries, "Cannot get provider: "+err.Error(), "pending")
 				continue
 			}
 
 			newInstance, err := provider.PerformPostProvision(Instance)
 			if err != nil {
-				UpdateTaskStatus(storage, task.Id, task.Retries+1, "Failed to update instance: " + err.Error(), "pending")
+				UpdateTaskStatus(storage, task.Id, task.Retries+1, "Failed to update instance: "+err.Error(), "pending")
 				continue
 			}
 
@@ -460,7 +458,7 @@ func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage S
 			output, err := UpgradeWithinProviders(storage, Instance, taskMetaData.Plan, namePrefix)
 			if err != nil {
 				glog.Infof("Cannot change plans for: %s, %s\n", task.Id, err.Error())
-				UpdateTaskStatus(storage, task.Id, task.Retries+1, "Cannot change plans: " + err.Error(), "pending")
+				UpdateTaskStatus(storage, task.Id, task.Retries+1, "Cannot change plans: "+err.Error(), "pending")
 				continue
 			}
 
@@ -475,7 +473,7 @@ func RunWorkerTasks(ctx context.Context, o Options, namePrefix string, storage S
 			Instance, err := GetInstanceById(namePrefix, storage, task.ResourceId)
 			if err != nil {
 				glog.Infof("Failed to get provider instance for task: %s, %s\n", task.Id, err.Error())
-				UpdateTaskStatus(storage, task.Id, task.Retries, "Cannot get Instance: " + err.Error(), "pending")
+				UpdateTaskStatus(storage, task.Id, task.Retries, "Cannot get Instance: "+err.Error(), "pending")
 				continue
 			}
 			var taskMetaData ChangeProvidersTaskMetadata

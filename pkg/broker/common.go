@@ -14,9 +14,9 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"sync"
-	"strings"
 	"strconv"
+	"strings"
+	"sync"
 	"text/template"
 	"time"
 )
@@ -26,7 +26,7 @@ var randomSource = rand.NewSource(time.Now().UnixNano())
 func ApplyParamsToStatement(statement string, args ...string) string {
 	for i, arg := range args {
 		idx := strconv.Itoa(i + 1)
-		statement = strings.Replace(statement, "$" + idx, arg, -1)
+		statement = strings.Replace(statement, "$"+idx, arg, -1)
 	}
 	return statement
 }
@@ -220,7 +220,7 @@ func (b *ActionBase) RouteActions(router *mux.Router) error {
 	for _, action := range b.actions {
 		glog.Infof("Adding route %s /v2/service_instances/{instance_id}/actions/%s\n", action.method, action.path)
 		var act Action = action
-		router.HandleFunc("/v2/service_instances/{instance_id}/actions/" + action.path, func(w http.ResponseWriter, r *http.Request) {
+		router.HandleFunc("/v2/service_instances/{instance_id}/actions/"+action.path, func(w http.ResponseWriter, r *http.Request) {
 			vars := mux.Vars(r)
 			c := broker.RequestContext{Request: r, Writer: w}
 			obj, herr := act.handler(vars["instance_id"], vars, &c)
@@ -242,7 +242,7 @@ func (b *ActionBase) RouteActions(router *mux.Router) error {
 				} else {
 					msg := "InternalServerError"
 					description := "Internal Server Error"
-					body := &e{ErrorMessage:&msg, Description:&description}
+					body := &e{ErrorMessage: &msg, Description: &description}
 					HttpWrite(w, 500, body)
 					return
 				}
@@ -307,7 +307,7 @@ func CrudeOSBIHacks(router *mux.Router, b *BusinessLogic) {
 			} else {
 				msg := "InternalServerError"
 				description := "Internal Server Error"
-				body := &e{ErrorMessage:&msg, Description:&description}
+				body := &e{ErrorMessage: &msg, Description: &description}
 				HttpWrite(w, 500, body)
 				return
 			}

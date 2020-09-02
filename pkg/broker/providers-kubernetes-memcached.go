@@ -3,34 +3,34 @@ package broker
 import (
 	"encoding/json"
 	"errors"
-	"strings"
-	"net"
-	"time"
 	"io/ioutil"
-	"os"
-	"path/filepath"
 	v1apps "k8s.io/api/apps/v1"
 	v1core "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/rest"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"net"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 type KubernetesInstanceMemcachedProvider struct {
 	Provider
-	kubernetes 			kubernetes.Interface
-	namePrefix          string
-	instanceCache 		map[string]*Instance
+	kubernetes    kubernetes.Interface
+	namePrefix    string
+	instanceCache map[string]*Instance
 }
 
 type MemcachedProviderPlan struct {
 	SizeInMegabytes string `json:"size_in_megabytes"`
-	Version string `json:"version"`
+	Version         string `json:"version"`
 }
 
 var namespace string = "memcached-system"
@@ -49,9 +49,9 @@ func homeDir() string {
 
 func NewKubernetesInstanceMemcachedProvider(namePrefix string) (*KubernetesInstanceMemcachedProvider, error) {
 	var provider KubernetesInstanceMemcachedProvider = KubernetesInstanceMemcachedProvider{
-		namePrefix:          namePrefix,
-		instanceCache:		 make(map[string]*Instance),
-		kubernetes:			 nil,
+		namePrefix:    namePrefix,
+		instanceCache: make(map[string]*Instance),
+		kubernetes:    nil,
 	}
 	if os.Getenv("TEST") == "true" {
 		if fakeClient == nil {
@@ -90,7 +90,7 @@ func NewKubernetesInstanceMemcachedProvider(namePrefix string) (*KubernetesInsta
 	return &provider, nil
 }
 
-func (provider KubernetesInstanceMemcachedProvider) GetInstance(name string, plan *ProviderPlan) (*Instance, error) {	
+func (provider KubernetesInstanceMemcachedProvider) GetInstance(name string, plan *ProviderPlan) (*Instance, error) {
 	result, err := provider.kubernetes.AppsV1().Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func (provider KubernetesInstanceMemcachedProvider) GetInstance(name string, pla
 	if len(result.Status.Conditions) > 0 {
 		status = result.Status.Conditions[0].Message
 	}
-	provider.instanceCache[name + plan.ID] = &Instance{
+	provider.instanceCache[name+plan.ID] = &Instance{
 		Id:            "", // providers should not store this.
 		ProviderId:    name,
 		Name:          name,
@@ -118,7 +118,7 @@ func (provider KubernetesInstanceMemcachedProvider) GetInstance(name string, pla
 		Scheme:        plan.Scheme,
 	}
 
-	return provider.instanceCache[name + plan.ID], nil
+	return provider.instanceCache[name+plan.ID], nil
 }
 
 func (provider KubernetesInstanceMemcachedProvider) PerformPostProvision(db *Instance) (*Instance, error) {
@@ -127,7 +127,7 @@ func (provider KubernetesInstanceMemcachedProvider) PerformPostProvision(db *Ins
 
 func (provider KubernetesInstanceMemcachedProvider) GetUrl(instance *Instance) map[string]interface{} {
 	return map[string]interface{}{
-		"MEMCACHED_URL":instance.Endpoint,
+		"MEMCACHED_URL": instance.Endpoint,
 	}
 }
 
@@ -144,11 +144,11 @@ func (provider KubernetesInstanceMemcachedProvider) Provision(Id string, plan *P
 	limits[v1core.ResourceMemory] = qty
 	name := provider.namePrefix + strings.ToLower(RandomString(9))
 	pod := v1core.PodTemplateSpec{
-		Spec: v1core.PodSpec {
+		Spec: v1core.PodSpec{
 			Containers: []v1core.Container{
 				v1core.Container{
-					Name:"memcached",
-					Image:"memcached:" + settings.Version,
+					Name:  "memcached",
+					Image: "memcached:" + settings.Version,
 					Resources: v1core.ResourceRequirements{
 						Limits: limits,
 					},
@@ -159,7 +159,7 @@ func (provider KubernetesInstanceMemcachedProvider) Provision(Id string, plan *P
 					Ports: []v1core.ContainerPort{
 						v1core.ContainerPort{
 							ContainerPort: 11211,
-							Protocol: v1core.ProtocolTCP,
+							Protocol:      v1core.ProtocolTCP,
 						},
 					},
 				},
@@ -168,8 +168,8 @@ func (provider KubernetesInstanceMemcachedProvider) Provision(Id string, plan *P
 	}
 	pod.SetName(name)
 	pod.SetNamespace(namespace)
-	pod.SetLabels(map[string]string {"app":name})
-	pod.SetAnnotations(map[string]string {"owner":Owner})
+	pod.SetLabels(map[string]string{"app": name})
+	pod.SetAnnotations(map[string]string{"owner": Owner})
 
 	var replicas int32 = 1
 	selector := metav1.LabelSelector{
@@ -187,8 +187,8 @@ func (provider KubernetesInstanceMemcachedProvider) Provision(Id string, plan *P
 	}
 	deployment.SetName(name)
 	deployment.SetNamespace(namespace)
-	deployment.SetLabels(map[string]string {"app":name})
-	deployment.SetAnnotations(map[string]string {"owner":Owner})
+	deployment.SetLabels(map[string]string{"app": name})
+	deployment.SetAnnotations(map[string]string{"owner": Owner})
 
 	result, err := provider.kubernetes.AppsV1().Deployments(namespace).Create(&deployment)
 	if err != nil {
@@ -201,21 +201,20 @@ func (provider KubernetesInstanceMemcachedProvider) Provision(Id string, plan *P
 			Type: v1core.ServiceTypeNodePort,
 			Ports: []v1core.ServicePort{
 				v1core.ServicePort{
-					Port: 11211,
+					Port:       11211,
 					TargetPort: intstr.FromInt(11211),
 				},
 			},
-			Selector: map[string]string {
+			Selector: map[string]string{
 				"app": name,
 			},
 		},
 	}
 	service.SetName(name)
 	service.SetNamespace(namespace)
-	service.SetLabels(map[string]string {"app": name})
-	service.SetAnnotations(map[string]string {"owner":Owner})
+	service.SetLabels(map[string]string{"app": name})
+	service.SetAnnotations(map[string]string{"owner": Owner})
 
-	
 	if _, err = provider.kubernetes.CoreV1().Services(namespace).Create(&service); err != nil {
 		return nil, err
 	}
@@ -322,14 +321,13 @@ func (provider KubernetesInstanceMemcachedProvider) Stats(Instance *Instance) ([
 		if strings.HasPrefix(element, "STAT") {
 			stat := strings.Split(element, " ")
 			stats = append(stats, Stat{
-				Key:stat[1],
-				Value:strings.TrimSpace(stat[2]),
+				Key:   stat[1],
+				Value: strings.TrimSpace(stat[2]),
 			})
 		}
 	}
 	return stats, nil
 }
-
 
 func (provider KubernetesInstanceMemcachedProvider) GetBackup(*Instance, string) (*BackupSpec, error) {
 	return nil, errors.New("Backups are unavailable on a memcached")
