@@ -1,7 +1,7 @@
 # Akkeris Redis and Memcached (ElastiCache) Broker
 
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/9b3065a9f42d44618ed8e459032e5964)](https://www.codacy.com/app/Akkeris/elasticache-broker?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=akkeris/elasticache-broker&amp;utm_campaign=Badge_Grade)
-[![Codacy Badge](https://api.codacy.com/project/badge/Coverage/9b3065a9f42d44618ed8e459032e5964)](https://www.codacy.com/app/Akkeris/elasticache-broker?utm_source=github.com&utm_medium=referral&utm_content=akkeris/elasticache-broker&utm_campaign=Badge_Coverage)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/e254f42669d24067b453298da2297e2d)](https://www.codacy.com/gh/akkeris/elasticache-broker?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=akkeris/elasticache-broker&amp;utm_campaign=Badge_Grade)
+
 [![CircleCI](https://circleci.com/gh/akkeris/elasticache-broker.svg?style=svg)](https://circleci.com/gh/akkeris/elasticache-broker)
 
 The ElastiCache broker is an Open Service Broker (OSB) cache broker that will provision redis and memcached instances on demand through a REST API. While it only supports AWS at the moment, support for more providers is on its way.
