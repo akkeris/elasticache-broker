@@ -285,9 +285,9 @@ type Storage interface {
 	StartProvisioningTasks() ([]Entry, error)
 	NukeInstance(string) error
 	WarnOnUnfinishedTasks()
-    IsRestoring(string) (bool, error)
-    IsUpgrading(string) (bool, error)
-    ValidateInstanceID(string) error
+	IsRestoring(string) (bool, error)
+	IsUpgrading(string) (bool, error)
+	ValidateInstanceID(string) error
 }
 
 type PostgresStorage struct {
@@ -365,10 +365,10 @@ func (b *PostgresStorage) getPlans(subquery string, arg string) ([]ProviderPlan,
 					"state":         state,
 					"attributes":    attributesJson,
 					"updated_at":    updated,
-                    "engine": map[string]string{
-                        "type": engineType,
-                        "version": engineVersion,
-                    },
+					"engine": map[string]string{
+						"type":    engineType,
+						"version": engineVersion,
+					},
 				},
 			},
 			Provider:               GetProvidersFromString(provider),
@@ -441,15 +441,15 @@ func (b *PostgresStorage) GetPlans(serviceId string) ([]ProviderPlan, error) {
 }
 
 func (b *PostgresStorage) IsUpgrading(dbId string) (bool, error) {
-    var count int64
-    err := b.db.QueryRow("select count(*) from tasks where ( status = 'started' or status = 'pending' ) and (action = 'change-providers' OR action = 'change-plans') and deleted = false and resource = $1", dbId).Scan(&count)
-    return count > 0, err
+	var count int64
+	err := b.db.QueryRow("select count(*) from tasks where ( status = 'started' or status = 'pending' ) and (action = 'change-providers' OR action = 'change-plans') and deleted = false and resource = $1", dbId).Scan(&count)
+	return count > 0, err
 }
 
 func (b *PostgresStorage) IsRestoring(dbId string) (bool, error) {
-    var count int64
-    err := b.db.QueryRow("select count(*) from tasks where ( status = 'started' or status = 'pending' ) and action = 'restore' and deleted = false and resource = $1", dbId).Scan(&count)
-    return count > 0, err
+	var count int64
+	err := b.db.QueryRow("select count(*) from tasks where ( status = 'started' or status = 'pending' ) and action = 'restore' and deleted = false and resource = $1", dbId).Scan(&count)
+	return count > 0, err
 }
 
 func (b *PostgresStorage) GetUnclaimedInstance(PlanId string, InstanceId string) (*Entry, error) {
@@ -482,7 +482,7 @@ func (b *PostgresStorage) GetUnclaimedInstance(PlanId string, InstanceId string)
 		return nil, err
 	}
 
-    entry.Claimed = true
+	entry.Claimed = true
 	entry.Id = InstanceId
 
 	if err = tx.Commit(); err != nil {
@@ -528,15 +528,15 @@ func (b *PostgresStorage) UpdateInstance(Instance *Instance, PlanId string) erro
 }
 
 func (b *PostgresStorage) ValidateInstanceID(id string) error {
-    var count int64
-    err := b.db.QueryRow("select count(*) from resources where id = $1", id).Scan(&count)
-    if err != nil {
-        return err
-    }
-    if count != 0 {
-        return errors.New("The instance id is already in use (even if deleted)")
-    }
-    return nil
+	var count int64
+	err := b.db.QueryRow("select count(*) from resources where id = $1", id).Scan(&count)
+	if err != nil {
+		return err
+	}
+	if count != 0 {
+		return errors.New("The instance id is already in use (even if deleted)")
+	}
+	return nil
 }
 
 func (b *PostgresStorage) StartProvisioningTasks() ([]Entry, error) {
@@ -644,16 +644,15 @@ func InitStorage(ctx context.Context, o Options) (*PostgresStorage, error) {
 		return nil, errors.New("Unable to create resource schema: " + err.Error())
 	}
 
-	
 	if _, err := db.Exec(sqlCreateScript); err != nil {
 		return nil, err
 	}
 
-    if os.Getenv("USE_KUBERNETES") == "true" {
-        if _, err := db.Exec(sqlCreateKubernetesPlans); err != nil {
-            return nil, err
-        }
-    }
+	if os.Getenv("USE_KUBERNETES") == "true" {
+		if _, err := db.Exec(sqlCreateKubernetesPlans); err != nil {
+			return nil, err
+		}
+	}
 
 	go cancelOnInterrupt(ctx, db)
 

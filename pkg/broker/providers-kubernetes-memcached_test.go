@@ -12,7 +12,6 @@ import (
 	// "encoding/json"
 )
 
-
 func TestKubernetesMemcachedProvision(t *testing.T) {
 	var namePrefix = "test"
 	var logic *BusinessLogic

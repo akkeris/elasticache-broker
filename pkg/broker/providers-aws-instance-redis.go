@@ -3,11 +3,11 @@ package broker
 import (
 	"encoding/json"
 	"errors"
-	"github.com/golang/glog"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elasticache"
 	"github.com/go-redis/redis"
+	"github.com/golang/glog"
 	"os"
 	"strconv"
 	"strings"
@@ -16,9 +16,9 @@ import (
 
 type AWSInstanceRedisProvider struct {
 	Provider
-	awssvc              *elasticache.ElastiCache
-	namePrefix          string
-	instanceCache 		map[string]*Instance
+	awssvc        *elasticache.ElastiCache
+	namePrefix    string
+	instanceCache map[string]*Instance
 }
 
 func NewAWSInstanceRedisProvider(namePrefix string) (*AWSInstanceRedisProvider, error) {
@@ -27,9 +27,9 @@ func NewAWSInstanceRedisProvider(namePrefix string) (*AWSInstanceRedisProvider, 
 	}
 	t := time.NewTicker(time.Second * 5)
 	AWSInstanceRedisProvider := &AWSInstanceRedisProvider{
-		namePrefix:          namePrefix,
-		instanceCache:		 make(map[string]*Instance),
-		awssvc:              elasticache.New(session.New(&aws.Config{Region: aws.String(os.Getenv("AWS_REGION"))})),
+		namePrefix:    namePrefix,
+		instanceCache: make(map[string]*Instance),
+		awssvc:        elasticache.New(session.New(&aws.Config{Region: aws.String(os.Getenv("AWS_REGION"))})),
 	}
 	go (func() {
 		for {
@@ -41,13 +41,13 @@ func NewAWSInstanceRedisProvider(namePrefix string) (*AWSInstanceRedisProvider, 
 }
 
 func (provider AWSInstanceRedisProvider) GetInstance(name string, plan *ProviderPlan) (*Instance, error) {
-	if provider.instanceCache[name + plan.ID] != nil {
-		return provider.instanceCache[name + plan.ID], nil
+	if provider.instanceCache[name+plan.ID] != nil {
+		return provider.instanceCache[name+plan.ID], nil
 	}
 	resp, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
-		CacheClusterId: 	aws.String(name),
-		MaxRecords: 		aws.Int64(20),
-		ShowCacheNodeInfo: 	aws.Bool(true),
+		CacheClusterId:    aws.String(name),
+		MaxRecords:        aws.Int64(20),
+		ShowCacheNodeInfo: aws.Bool(true),
 	})
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (provider AWSInstanceRedisProvider) GetInstance(name string, plan *Provider
 	if len(resp.CacheClusters) > 0 && len(resp.CacheClusters[0].CacheNodes) > 0 && resp.CacheClusters[0].CacheNodes[0].Endpoint != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Port != nil && resp.CacheClusters[0].CacheNodes[0].Endpoint.Address != nil {
 		endpoint = *resp.CacheClusters[0].CacheNodes[0].Endpoint.Address + ":" + strconv.FormatInt(*resp.CacheClusters[0].CacheNodes[0].Endpoint.Port, 10)
 	}
-	provider.instanceCache[name + plan.ID] = &Instance{
+	provider.instanceCache[name+plan.ID] = &Instance{
 		Id:            "", // providers should not store this.
 		ProviderId:    *resp.CacheClusters[0].CacheClusterId,
 		Name:          name,
@@ -71,7 +71,7 @@ func (provider AWSInstanceRedisProvider) GetInstance(name string, plan *Provider
 		Scheme:        plan.Scheme,
 	}
 
-	return provider.instanceCache[name + plan.ID], nil
+	return provider.instanceCache[name+plan.ID], nil
 }
 
 func (provider AWSInstanceRedisProvider) PerformPostProvision(db *Instance) (*Instance, error) {
@@ -80,7 +80,7 @@ func (provider AWSInstanceRedisProvider) PerformPostProvision(db *Instance) (*In
 
 func (provider AWSInstanceRedisProvider) GetUrl(instance *Instance) map[string]interface{} {
 	return map[string]interface{}{
-		"REDIS_URL":instance.Scheme + "://" + instance.Endpoint,
+		"REDIS_URL": instance.Scheme + "://" + instance.Endpoint,
 	}
 }
 
@@ -112,7 +112,6 @@ func (provider AWSInstanceRedisProvider) ProvisionWithSettings(Id string, plan *
 	}, nil
 }
 
-
 func (provider AWSInstanceRedisProvider) Provision(Id string, plan *ProviderPlan, Owner string) (*Instance, error) {
 	var settings elasticache.CreateCacheClusterInput
 	if err := json.Unmarshal([]byte(plan.providerPrivateDetails), &settings); err != nil {
@@ -129,7 +128,7 @@ func (provider AWSInstanceRedisProvider) Deprovision(Instance *Instance, takeSna
 		snapshot = aws.String(Instance.ProviderId + "-final")
 	}
 	_, err := provider.awssvc.DeleteCacheCluster(&elasticache.DeleteCacheClusterInput{
-		CacheClusterId: aws.String(Instance.ProviderId),
+		CacheClusterId:          aws.String(Instance.ProviderId),
 		FinalSnapshotIdentifier: snapshot,
 	})
 	return err
@@ -139,19 +138,19 @@ func (provider AWSInstanceRedisProvider) ModifyWithSettings(instance *Instance, 
 	glog.Infof("Instance: %s modifying settings...\n", instance.Id)
 	// TODO: Support ModifyReplicationGroup rather than a single cache cluster.
 	resp, err := provider.awssvc.ModifyCacheCluster(&elasticache.ModifyCacheClusterInput{
-		AZMode:        				settings.AZMode,
-		ApplyImmediately: 			aws.Bool(true),
-		AutoMinorVersionUpgrade:	settings.AutoMinorVersionUpgrade,
-		CacheClusterId:				aws.String(instance.ProviderId),
-		CacheNodeType:         	 	settings.CacheNodeType,
-		CacheParameterGroupName:   	settings.CacheParameterGroupName,
+		AZMode:                     settings.AZMode,
+		ApplyImmediately:           aws.Bool(true),
+		AutoMinorVersionUpgrade:    settings.AutoMinorVersionUpgrade,
+		CacheClusterId:             aws.String(instance.ProviderId),
+		CacheNodeType:              settings.CacheNodeType,
+		CacheParameterGroupName:    settings.CacheParameterGroupName,
 		CacheSecurityGroupNames:    settings.CacheSecurityGroupNames,
-		EngineVersion:      		settings.EngineVersion,
-		NotificationTopicArn:		settings.NotificationTopicArn,
-		NumCacheNodes:     			settings.NumCacheNodes,
+		EngineVersion:              settings.EngineVersion,
+		NotificationTopicArn:       settings.NotificationTopicArn,
+		NumCacheNodes:              settings.NumCacheNodes,
 		PreferredMaintenanceWindow: settings.PreferredMaintenanceWindow,
-		SecurityGroupIds:			settings.SecurityGroupIds,
-		SnapshotRetentionLimit:   	settings.SnapshotRetentionLimit,
+		SecurityGroupIds:           settings.SecurityGroupIds,
+		SnapshotRetentionLimit:     settings.SnapshotRetentionLimit,
 		SnapshotWindow:             settings.SnapshotWindow,
 	})
 	if err != nil {
@@ -167,9 +166,9 @@ func (provider AWSInstanceRedisProvider) ModifyWithSettings(instance *Instance, 
 	}
 
 	res, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
-		CacheClusterId: 	aws.String(instance.ProviderId),
-		MaxRecords: 		aws.Int64(20),
-		ShowCacheNodeInfo: 	aws.Bool(true),
+		CacheClusterId:    aws.String(instance.ProviderId),
+		MaxRecords:        aws.Int64(20),
+		ShowCacheNodeInfo: aws.Bool(true),
 	})
 	if err != nil {
 		return nil, err
@@ -233,9 +232,9 @@ func (provider AWSInstanceRedisProvider) Restart(Instance *Instance) error {
 		return errors.New("Cannot restart a database that is unavailable.")
 	}
 	res, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
-		CacheClusterId: 	aws.String(Instance.ProviderId),
-		MaxRecords: 		aws.Int64(20),
-		ShowCacheNodeInfo: 	aws.Bool(true),
+		CacheClusterId:    aws.String(Instance.ProviderId),
+		MaxRecords:        aws.Int64(20),
+		ShowCacheNodeInfo: aws.Bool(true),
 	})
 	if err != nil {
 		return err
@@ -248,7 +247,7 @@ func (provider AWSInstanceRedisProvider) Restart(Instance *Instance) error {
 		nodes = append(nodes, node.CacheNodeId)
 	}
 	_, err = provider.awssvc.RebootCacheCluster(&elasticache.RebootCacheClusterInput{
-		CacheClusterId: aws.String(Instance.ProviderId),
+		CacheClusterId:       aws.String(Instance.ProviderId),
 		CacheNodeIdsToReboot: nodes,
 	})
 	return err
@@ -260,9 +259,9 @@ func (provider AWSInstanceRedisProvider) Flush(Instance *Instance) error {
 
 func (provider AWSInstanceRedisProvider) Stats(Instance *Instance) ([]Stat, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr: Instance.Endpoint,
+		Addr:     Instance.Endpoint,
 		Password: Instance.Password,
-		DB: 0,
+		DB:       0,
 	})
 	defer client.Close()
 	info, err := client.Info().Result()
@@ -277,8 +276,8 @@ func (provider AWSInstanceRedisProvider) Stats(Instance *Instance) ([]Stat, erro
 			sep := strings.Split(keyValLine, ":")
 			if len(sep) == 2 {
 				stats = append(stats, Stat{
-					Key:sep[0],
-					Value:strings.Trim(strings.TrimSpace(sep[1]), "\r"),
+					Key:   sep[0],
+					Value: strings.Trim(strings.TrimSpace(sep[1]), "\r"),
 				})
 			}
 		}
@@ -290,7 +289,7 @@ func (provider AWSInstanceRedisProvider) Stats(Instance *Instance) ([]Stat, erro
 func (provider AWSInstanceRedisProvider) GetBackup(instance *Instance, Id string) (*BackupSpec, error) {
 	snapshots, err := provider.awssvc.DescribeSnapshots(&elasticache.DescribeSnapshotsInput{
 		CacheClusterId: aws.String(instance.Name),
-		SnapshotName: aws.String(Id),
+		SnapshotName:   aws.String(Id),
 	})
 	if err != nil {
 		return nil, err
@@ -307,7 +306,7 @@ func (provider AWSInstanceRedisProvider) GetBackup(instance *Instance, Id string
 		created = snapshots.Snapshots[0].NodeSnapshots[0].SnapshotCreateTime.UTC().Format(time.RFC3339)
 	}
 
-	var progress int64  = 100
+	var progress int64 = 100
 	if *snapshots.Snapshots[0].SnapshotStatus == "creating" {
 		progress = 50
 	}
@@ -335,7 +334,7 @@ func (provider AWSInstanceRedisProvider) ListBackups(instance *Instance) ([]Back
 			if snapshot.NodeSnapshots[0].SnapshotCreateTime != nil {
 				created = snapshot.NodeSnapshots[0].SnapshotCreateTime.UTC().Format(time.RFC3339)
 			}
-			var progress int64  = 100
+			var progress int64 = 100
 			if *snapshot.SnapshotStatus == "creating" {
 				progress = 50
 			}
@@ -359,7 +358,7 @@ func (provider AWSInstanceRedisProvider) CreateBackup(instance *Instance) (*Back
 	}
 	snapshotOut, err := provider.awssvc.CreateSnapshot(&elasticache.CreateSnapshotInput{
 		CacheClusterId: aws.String(instance.Name),
-		SnapshotName: aws.String(instance.Name + "-manual-" + RandomString(10)),
+		SnapshotName:   aws.String(instance.Name + "-manual-" + RandomString(10)),
 	})
 	if err != nil {
 		return nil, err
@@ -374,7 +373,7 @@ func (provider AWSInstanceRedisProvider) CreateBackup(instance *Instance) (*Back
 	if snapshot.NodeSnapshots[0].SnapshotCreateTime != nil {
 		created = snapshot.NodeSnapshots[0].SnapshotCreateTime.UTC().Format(time.RFC3339)
 	}
-	var progress int64  = 100
+	var progress int64 = 100
 	if *snapshot.SnapshotStatus == "creating" {
 		progress = 50
 	}
@@ -413,8 +412,8 @@ func (provider AWSInstanceRedisProvider) RestoreBackup(instance *Instance, Id st
 	// For AWS, the best strategy for restoring (reliably) a redis is to rename the existing db
 	// then create from a snapshot the existing db, and then nuke the old one once finished.
 	awsResp, err := provider.awssvc.DescribeCacheClusters(&elasticache.DescribeCacheClustersInput{
-		CacheClusterId: 	aws.String(instance.Name),
-		MaxRecords:         aws.Int64(20),
+		CacheClusterId: aws.String(instance.Name),
+		MaxRecords:     aws.Int64(20),
 	})
 	if err != nil {
 		return err
@@ -431,7 +430,6 @@ func (provider AWSInstanceRedisProvider) RestoreBackup(instance *Instance, Id st
 	// 	return err
 	// }
 
-
 	// Start Restore Process
 	var privateSecurityGroups []*string = make([]*string, 0)
 	for _, group := range awsResp.CacheClusters[0].SecurityGroups {
@@ -446,7 +444,7 @@ func (provider AWSInstanceRedisProvider) RestoreBackup(instance *Instance, Id st
 	renamedId := instance.Name + "-restore-" + RandomString(5)
 
 	_, err = provider.awssvc.DeleteCacheCluster(&elasticache.DeleteCacheClusterInput{
-		CacheClusterId: aws.String(instance.Name),
+		CacheClusterId:          aws.String(instance.Name),
 		FinalSnapshotIdentifier: aws.String(renamedId),
 	})
 	if err != nil {
@@ -483,27 +481,27 @@ func (provider AWSInstanceRedisProvider) RestoreBackup(instance *Instance, Id st
 
 	_, err = provider.awssvc.CreateCacheCluster(&elasticache.CreateCacheClusterInput{
 		// -- AZMode - intentionally left out as it only applies to memcached.
-		AuthToken: authToken,
-		AutoMinorVersionUpgrade: awsResp.CacheClusters[0].AutoMinorVersionUpgrade,
-		CacheClusterId: aws.String(instance.Name),
-		CacheNodeType: awsResp.CacheClusters[0].CacheNodeType,
-		CacheParameterGroupName: cacheParameterGroupName,
-		CacheSecurityGroupNames: publicSecurityGroups, 								// only on non-VPC systems
-		CacheSubnetGroupName: awsResp.CacheClusters[0].CacheSubnetGroupName,		// only on VPC systems
-		Engine: awsResp.CacheClusters[0].Engine,
-		EngineVersion: awsResp.CacheClusters[0].EngineVersion,
-		NotificationTopicArn: notificationTopicArn,
-		NumCacheNodes: awsResp.CacheClusters[0].NumCacheNodes,
-		Port: port,
+		AuthToken:                 authToken,
+		AutoMinorVersionUpgrade:   awsResp.CacheClusters[0].AutoMinorVersionUpgrade,
+		CacheClusterId:            aws.String(instance.Name),
+		CacheNodeType:             awsResp.CacheClusters[0].CacheNodeType,
+		CacheParameterGroupName:   cacheParameterGroupName,
+		CacheSecurityGroupNames:   publicSecurityGroups,                          // only on non-VPC systems
+		CacheSubnetGroupName:      awsResp.CacheClusters[0].CacheSubnetGroupName, // only on VPC systems
+		Engine:                    awsResp.CacheClusters[0].Engine,
+		EngineVersion:             awsResp.CacheClusters[0].EngineVersion,
+		NotificationTopicArn:      notificationTopicArn,
+		NumCacheNodes:             awsResp.CacheClusters[0].NumCacheNodes,
+		Port:                      port,
 		PreferredAvailabilityZone: awsResp.CacheClusters[0].PreferredAvailabilityZone,
 		// -- PreferredAvailabilityZones - Intentionally left out as it only applies to memcached.
 		PreferredMaintenanceWindow: awsResp.CacheClusters[0].PreferredMaintenanceWindow,
-		ReplicationGroupId: awsResp.CacheClusters[0].ReplicationGroupId,
-		SecurityGroupIds: privateSecurityGroups,
+		ReplicationGroupId:         awsResp.CacheClusters[0].ReplicationGroupId,
+		SecurityGroupIds:           privateSecurityGroups,
 		// -- SnapshotArns -- intentionally left out as I believe it will try to restore from this.
-		SnapshotName: aws.String(Id),
+		SnapshotName:           aws.String(Id),
 		SnapshotRetentionLimit: awsResp.CacheClusters[0].SnapshotRetentionLimit,
-		SnapshotWindow: awsResp.CacheClusters[0].SnapshotWindow,
+		SnapshotWindow:         awsResp.CacheClusters[0].SnapshotWindow,
 		// -- Tags: tagsResp.TagList - unable to get tags ATM.
 	})
 	if err != nil {
@@ -513,8 +511,8 @@ func (provider AWSInstanceRedisProvider) RestoreBackup(instance *Instance, Id st
 	}
 
 	err = provider.awssvc.WaitUntilCacheClusterAvailable(&elasticache.DescribeCacheClustersInput{
-		CacheClusterId: 	aws.String(instance.Name),
-		MaxRecords:         aws.Int64(20),
+		CacheClusterId: aws.String(instance.Name),
+		MaxRecords:     aws.Int64(20),
 	})
 	if err != nil {
 		glog.Errorf("ERROR: Waiting for the existing cache cluster: %s %s\n", renamedId, err.Error())
@@ -523,6 +521,3 @@ func (provider AWSInstanceRedisProvider) RestoreBackup(instance *Instance, Id st
 
 	return err
 }
-
-
-

@@ -29,7 +29,7 @@ type Entry struct {
 	Name     string
 	PlanId   string
 	Claimed  bool
-	Tasks	 int
+	Tasks    int
 	Status   string
 	Username string
 	Password string
@@ -59,11 +59,10 @@ type BackupSpec struct {
 	Created  string       `json:"created_at"`
 }
 
-
 func IsAvailable(status string) bool {
 	return status == "available" ||
-			// gcloud status
-			status == "RUNNABLE"
+		// gcloud status
+		status == "RUNNABLE"
 }
 
 func IsReady(status string) bool {
@@ -88,12 +87,12 @@ func InProgress(status string) bool {
 
 func CanGetBindings(status string) bool {
 	// Should we potentially add upgrading to this list?
-	return  status != "creating" && status != "starting" && status != "modifying" &&
-			status != "stopping" && status != "stopped" && status != "deleting" && status != "deleted" &&
-			status != "incompatible-network" &&
-			// gcloud states
-			status != "SUSPENDED" && status != "PENDING_CREATE" && status != "MAINTENANCE" &&
-			status != "FAILED" && status != "UNKNOWN_STATE"
+	return status != "creating" && status != "starting" && status != "modifying" &&
+		status != "stopping" && status != "stopped" && status != "deleting" && status != "deleted" &&
+		status != "incompatible-network" &&
+		// gcloud states
+		status != "SUSPENDED" && status != "PENDING_CREATE" && status != "MAINTENANCE" &&
+		status != "FAILED" && status != "UNKNOWN_STATE"
 }
 
 func CanBeModified(status string) bool {
@@ -110,6 +109,6 @@ func CanBeModified(status string) bool {
 
 //available, failed, incompatible-parameters, incompatible-network, restore-failed, recovering
 func CanBeDeleted(status string) bool {
-	return 	status == "available" || status == "failed" || status == "incompatible-parameters" || 
-			status == "incompatible-network" || status == "restore-failed" || status == "recovering"
+	return status == "available" || status == "failed" || status == "incompatible-parameters" ||
+		status == "incompatible-network" || status == "restore-failed" || status == "recovering"
 }
