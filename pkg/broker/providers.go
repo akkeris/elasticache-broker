@@ -59,7 +59,11 @@ func GetProviderByPlan(namePrefix string, plan *ProviderPlan) (Provider, error) 
 	} else if plan.Provider == AWSMemcachedInstance {
 		return NewAWSInstanceMemcachedProvider(namePrefix)
 	} else if plan.Provider == KubernetesMemcachedInstance && os.Getenv("USE_KUBERNETES") == "true" {
-		return NewKubernetesInstanceMemcachedProvider(namePrefix)
+		if os.Getenv("TEST") == "true" {
+			return NewKubernetesInstanceMemcachedProvider(namePrefix)
+		} else {
+			return NewKubernetesInstanceMemcachedProvider(namePrefix)
+		}
 	} else {
 		return nil, errors.New("Unable to find provider for plan.")
 	}

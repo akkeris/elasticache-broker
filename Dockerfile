@@ -1,4 +1,4 @@
-FROM golang:1.12-alpine
+FROM golang:1.14-alpine
 ENV GO111MODULE=on
 RUN apk update
 RUN apk add openssl ca-certificates git make build-base postgresql

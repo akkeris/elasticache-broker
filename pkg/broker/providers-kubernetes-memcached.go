@@ -17,11 +17,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/rest"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 type KubernetesInstanceMemcachedProvider struct {
 	Provider
-	kubernetes 			*kubernetes.Clientset
+	kubernetes 			kubernetes.Interface
 	namePrefix          string
 	instanceCache 		map[string]*Instance
 }
@@ -32,6 +34,7 @@ type MemcachedProviderPlan struct {
 }
 
 var namespace string = "memcached-system"
+var fakeClient kubernetes.Interface = nil
 
 func IsReadyKubernetes(dep *v1apps.Deployment) bool {
 	return dep.Status.ReadyReplicas == dep.Status.Replicas
@@ -45,34 +48,46 @@ func homeDir() string {
 }
 
 func NewKubernetesInstanceMemcachedProvider(namePrefix string) (*KubernetesInstanceMemcachedProvider, error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		config, err = clientcmd.BuildConfigFromFlags("", filepath.Join(homeDir(), ".kube", "config"))
+	var provider KubernetesInstanceMemcachedProvider = KubernetesInstanceMemcachedProvider{
+		namePrefix:          namePrefix,
+		instanceCache:		 make(map[string]*Instance),
+		kubernetes:			 nil,
+	}
+	if os.Getenv("TEST") == "true" {
+		if fakeClient == nil {
+			fakeClient = fake.NewSimpleClientset()
+		}
+		provider.kubernetes = fakeClient
+	} else {
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			// An explicit instruction must be given to allow us to use the local kube config.
+			if os.Getenv("USE_LOCAL_KUBE_CONTEXT") == "true" {
+				config, err = clientcmd.BuildConfigFromFlags("", filepath.Join(homeDir(), ".kube", "config"))
+				if err != nil {
+					panic(err.Error())
+				}
+			} else {
+				panic(err.Error())
+			}
+		}
+
+		clientset, err := kubernetes.NewForConfig(config)
 		if err != nil {
 			panic(err.Error())
 		}
+		provider.kubernetes = clientset
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err.Error())
-	}
 	t := time.NewTicker(time.Second * 5)
-
-	KubernetesInstanceMemcachedProvider := &KubernetesInstanceMemcachedProvider{
-		namePrefix:          namePrefix,
-		instanceCache:		 make(map[string]*Instance),
-		kubernetes: 		 clientset,
-	}
-
 	go (func() {
 		for {
-			KubernetesInstanceMemcachedProvider.instanceCache = make(map[string]*Instance)
+			provider.instanceCache = make(map[string]*Instance)
 			<-t.C
 		}
 	})()
 
-	return KubernetesInstanceMemcachedProvider, nil
+	return &provider, nil
 }
 
 func (provider KubernetesInstanceMemcachedProvider) GetInstance(name string, plan *ProviderPlan) (*Instance, error) {	
@@ -84,6 +99,10 @@ func (provider KubernetesInstanceMemcachedProvider) GetInstance(name string, pla
 	if err := json.Unmarshal([]byte(plan.providerPrivateDetails), &settings); err != nil {
 		return nil, err
 	}
+	status := "unknown"
+	if len(result.Status.Conditions) > 0 {
+		status = result.Status.Conditions[0].Message
+	}
 	provider.instanceCache[name + plan.ID] = &Instance{
 		Id:            "", // providers should not store this.
 		ProviderId:    name,
@@ -92,7 +111,7 @@ func (provider KubernetesInstanceMemcachedProvider) GetInstance(name string, pla
 		Username:      "", // providers should not store this.
 		Password:      "", // providers should not store this.
 		Endpoint:      name + "." + namespace + ".svc.cluster.local:11211",
-		Status:        result.Status.Conditions[0].Message,
+		Status:        status,
 		Ready:         IsReadyKubernetes(result),
 		Engine:        "memcached",
 		EngineVersion: settings.Version,
@@ -209,7 +228,7 @@ func (provider KubernetesInstanceMemcachedProvider) Provision(Id string, plan *P
 		Username:      "",
 		Password:      "",
 		Endpoint:      name + "." + namespace + ".svc.cluster.local:11211",
-		Status:        "Creating",
+		Status:        "creating",
 		Ready:         IsReadyKubernetes(result),
 		Engine:        "memcached",
 		EngineVersion: settings.Version,
