@@ -47,6 +47,7 @@ Note that you can get away with not setting `AWS_ACCESS_KEY_ID` and `AWS_SECRET_
 **Kubernetes Provider Specfic**
 
 * `USE_KUBERNETES` - must be set to `true` to use kubernetes
+* `USE_LOCAL_KUBE_CONTEXT` - By default only a in-cluster service account will be auto detected, to allow elasticache broker to use your `~/.kube/config` with the local context this must be set to `true`. Use `kubectl config use-context [xyz]` to set the context it should use locally. This should only be set if you are developing locally.
 
 In addition, the namespace `memcached-system` must be created with a service account to create, update and delete servces/deployments/pods in this namespace attached to the deployment of the elasticache broker.
 

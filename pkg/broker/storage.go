@@ -650,7 +650,6 @@ func InitStorage(ctx context.Context, o Options) (*PostgresStorage, error) {
 	}
 
     if os.Getenv("USE_KUBERNETES") == "true" {
-        glog.Infof("Creating kubernetes plans...\n")
         if _, err := db.Exec(sqlCreateKubernetesPlans); err != nil {
             return nil, err
         }
