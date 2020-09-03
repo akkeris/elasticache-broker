@@ -12,6 +12,7 @@ const (
 	AWSRedisInstance            Providers = "aws-redis-instance"
 	AWSMemcachedInstance        Providers = "aws-memcached-instance"
 	KubernetesMemcachedInstance Providers = "kubernetes-memcached-instance"
+	KubernetesRedisInstance 	Providers = "kubernetes-redis-instance"
 	Unknown                     Providers = "unknown"
 )
 
@@ -22,6 +23,8 @@ func GetProvidersFromString(str string) Providers {
 		return AWSMemcachedInstance
 	} else if str == "kubernetes-memcached-instance" {
 		return KubernetesMemcachedInstance
+	} else if str == "kubernetes-redis-instance" {
+		return KubernetesRedisInstance
 	}
 	return Unknown
 }
@@ -46,7 +49,6 @@ type Provider interface {
 	GetUrl(*Instance) map[string]interface{}
 	Flush(*Instance) error
 	Stats(*Instance) ([]Stat, error)
-
 	GetBackup(*Instance, string) (*BackupSpec, error)
 	ListBackups(*Instance) ([]BackupSpec, error)
 	CreateBackup(*Instance) (*BackupSpec, error)
@@ -63,6 +65,12 @@ func GetProviderByPlan(namePrefix string, plan *ProviderPlan) (Provider, error) 
 			return NewKubernetesInstanceMemcachedProvider(namePrefix)
 		} else {
 			return NewKubernetesInstanceMemcachedProvider(namePrefix)
+		}
+	} else if plan.Provider == KubernetesRedisInstance && os.Getenv("USE_KUBERNETES") == "true" {
+		if os.Getenv("TEST") == "true" {
+			return NewKubernetesInstanceRedisProvider(namePrefix)
+		} else {
+			return NewKubernetesInstanceRedisProvider(namePrefix)
 		}
 	} else {
 		return nil, errors.New("Unable to find provider for plan.")

@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestKubernetesMemcachedProvision(t *testing.T) {
+func TestKubernetesRedisProvision(t *testing.T) {
 	var namePrefix = "test"
 	var logic *BusinessLogic
 	var catalog *broker.CatalogResponse
@@ -39,9 +39,9 @@ func TestKubernetesMemcachedProvision(t *testing.T) {
 			So(catalog, ShouldNotBeNil)
 			So(len(catalog.Services), ShouldEqual, 2)
 
-			var service osb.Service
+			var service osb.Service 
 			for _, s := range catalog.Services {
-				if s.Name == "akkeris-memcached" {
+				if s.Name == "akkeris-redis" {
 					service = s
 				}
 			}
@@ -49,7 +49,7 @@ func TestKubernetesMemcachedProvision(t *testing.T) {
 
 			var foundStandard0 = false
 			for _, p := range service.Plans {
-				if p.Name == "standard-0" {
+				if p.Name == "ephemeral-0" {
 					plan = p
 					foundStandard0 = true
 				}
@@ -58,7 +58,7 @@ func TestKubernetesMemcachedProvision(t *testing.T) {
 
 			var foundStandard1 = false
 			for _, p := range service.Plans {
-				if p.Name == "standard-1" {
+				if p.Name == "ephemeral-1" {
 					highPlan = p
 					foundStandard1 = true
 				}
@@ -68,7 +68,7 @@ func TestKubernetesMemcachedProvision(t *testing.T) {
 			So(highPlan, ShouldNotBeNil)
 		})
 
-		Convey("Ensure kubernetes provisioner can provision a memcached instance", func() {
+		Convey("Ensure kubernetes provisioner can provision a redis instance", func() {
 			var request osb.ProvisionRequest
 			var c broker.RequestContext
 			request.AcceptsIncomplete = false
@@ -91,7 +91,7 @@ func TestKubernetesMemcachedProvision(t *testing.T) {
 			So(res, ShouldNotBeNil)
 		})
 
-		Convey("Get and create service bindings on kubernetes memcached", func() {
+		Convey("Get and create service bindings on kubernetes redis", func() {
 			var request osb.LastOperationRequest = osb.LastOperationRequest{InstanceID: instanceId}
 			var c broker.RequestContext
 			res, err := logic.LastOperation(&request, &c)
@@ -105,17 +105,17 @@ func TestKubernetesMemcachedProvision(t *testing.T) {
 			dres, err := logic.Bind(&brequest, &c)
 			So(err, ShouldBeNil)
 			So(dres, ShouldNotBeNil)
-			So(dres.Credentials["MEMCACHED_URL"].(string), ShouldEndWith, "memcached-system.svc.cluster.local:11211")
+			So(dres.Credentials["REDIS_URL"].(string), ShouldEndWith, "redis-system.svc.cluster.local:6379")
 
 			var gbrequest osb.GetBindingRequest = osb.GetBindingRequest{InstanceID: instanceId, BindingID: "foo"}
 			gbres, err := logic.GetBinding(&gbrequest, &c)
 			So(err, ShouldBeNil)
 			So(gbres, ShouldNotBeNil)
-			So(gbres.Credentials["MEMCACHED_URL"].(string), ShouldEndWith, "memcached-system.svc.cluster.local:11211")
-			So(gbres.Credentials["MEMCACHED_URL"].(string), ShouldEqual, dres.Credentials["MEMCACHED_URL"].(string))
+			So(gbres.Credentials["REDIS_URL"].(string), ShouldEndWith, "redis-system.svc.cluster.local:6379")
+			So(gbres.Credentials["REDIS_URL"].(string), ShouldEqual, dres.Credentials["REDIS_URL"].(string))
 		})
 
-		Convey("Ensure unbind for kubernetes memcached works", func() {
+		Convey("Ensure unbind for kubernetes redis works", func() {
 			var c broker.RequestContext
 			var urequest osb.UnbindRequest = osb.UnbindRequest{InstanceID: instanceId, BindingID: "foo"}
 			ures, err := logic.Unbind(&urequest, &c)
@@ -123,7 +123,7 @@ func TestKubernetesMemcachedProvision(t *testing.T) {
 			So(ures, ShouldNotBeNil)
 		})
 
-		Convey("Ensure deprovisioner for kubernetes memcached works", func() {
+		Convey("Ensure deprovisioner for kubernetes redis works", func() {
 			var request osb.LastOperationRequest = osb.LastOperationRequest{InstanceID: instanceId}
 			var c broker.RequestContext
 			res, err := logic.LastOperation(&request, &c)
