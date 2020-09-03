@@ -1,6 +1,7 @@
 # Akkeris Redis and Memcached (ElastiCache) Broker
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/e254f42669d24067b453298da2297e2d)](https://www.codacy.com/gh/akkeris/elasticache-broker?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=akkeris/elasticache-broker&amp;utm_campaign=Badge_Grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/e254f42669d24067b453298da2297e2d)](https://www.codacy.com/gh/akkeris/elasticache-broker?utm_source=github.com&utm_medium=referral&utm_content=akkeris/elasticache-broker&utm_campaign=Badge_Coverage)
 
 [![CircleCI](https://circleci.com/gh/akkeris/elasticache-broker.svg?style=svg)](https://circleci.com/gh/akkeris/elasticache-broker)
 
