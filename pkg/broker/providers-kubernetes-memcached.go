@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"strconv"
 	"time"
 
 	"k8s.io/client-go/kubernetes/fake"
@@ -31,8 +32,12 @@ type KubernetesInstanceMemcachedProvider struct {
 type MemcachedProviderPlan struct {
 	SizeInMegabytes string `json:"size_in_megabytes"`
 	Version         string `json:"version"`
+	DockerImage		*string `json:"docker_image"`
+	Port 			*int `json:"port"`
 }
 
+var defaultPort int = 11211
+var defaultImage string = "memcached"
 var namespace string = "memcached-system"
 var fakeClient kubernetes.Interface = nil
 
@@ -99,6 +104,12 @@ func (provider KubernetesInstanceMemcachedProvider) GetInstance(name string, pla
 	if err := json.Unmarshal([]byte(plan.providerPrivateDetails), &settings); err != nil {
 		return nil, err
 	}
+	if settings.Port == nil || *settings.Port == 0 {
+		settings.Port = &defaultPort
+	}
+	if settings.DockerImage == nil || *settings.DockerImage == "" {
+		settings.DockerImage = &defaultImage
+	}
 	status := "unknown"
 	if len(result.Status.Conditions) > 0 {
 		status = result.Status.Conditions[0].Message
@@ -110,7 +121,7 @@ func (provider KubernetesInstanceMemcachedProvider) GetInstance(name string, pla
 		Plan:          plan,
 		Username:      "", // providers should not store this.
 		Password:      "", // providers should not store this.
-		Endpoint:      name + "." + namespace + ".svc.cluster.local:11211",
+		Endpoint:      name + "." + namespace + ".svc.cluster.local:" + strconv.Itoa(*settings.Port),
 		Status:        status,
 		Ready:         IsReadyKubernetes(result),
 		Engine:        "memcached",
@@ -136,6 +147,12 @@ func (provider KubernetesInstanceMemcachedProvider) Provision(Id string, plan *P
 	if err := json.Unmarshal([]byte(plan.providerPrivateDetails), &settings); err != nil {
 		return nil, err
 	}
+	if settings.Port == nil || *settings.Port == 0 {
+		settings.Port = &defaultPort
+	}
+	if settings.DockerImage == nil || *settings.DockerImage == "" {
+		settings.DockerImage = &defaultImage
+	}
 	limits := v1core.ResourceList{}
 	qty, err := resource.ParseQuantity(settings.SizeInMegabytes + "Mi")
 	if err != nil {
@@ -148,7 +165,7 @@ func (provider KubernetesInstanceMemcachedProvider) Provision(Id string, plan *P
 			Containers: []v1core.Container{
 				v1core.Container{
 					Name:  "memcached",
-					Image: "memcached:" + settings.Version,
+					Image: *settings.DockerImage + ":" + settings.Version,
 					Resources: v1core.ResourceRequirements{
 						Limits: limits,
 					},
@@ -158,7 +175,7 @@ func (provider KubernetesInstanceMemcachedProvider) Provision(Id string, plan *P
 					},
 					Ports: []v1core.ContainerPort{
 						v1core.ContainerPort{
-							ContainerPort: 11211,
+							ContainerPort: int32(*settings.Port),
 							Protocol:      v1core.ProtocolTCP,
 						},
 					},
@@ -201,8 +218,8 @@ func (provider KubernetesInstanceMemcachedProvider) Provision(Id string, plan *P
 			Type: v1core.ServiceTypeNodePort,
 			Ports: []v1core.ServicePort{
 				v1core.ServicePort{
-					Port:       11211,
-					TargetPort: intstr.FromInt(11211),
+					Port:       int32(*settings.Port),
+					TargetPort: intstr.FromInt(*settings.Port),
 				},
 			},
 			Selector: map[string]string{
@@ -226,7 +243,7 @@ func (provider KubernetesInstanceMemcachedProvider) Provision(Id string, plan *P
 		Plan:          plan,
 		Username:      "",
 		Password:      "",
-		Endpoint:      name + "." + namespace + ".svc.cluster.local:11211",
+		Endpoint:      name + "." + namespace + ".svc.cluster.local:" + strconv.Itoa(*settings.Port),
 		Status:        "creating",
 		Ready:         IsReadyKubernetes(result),
 		Engine:        "memcached",
