@@ -36,9 +36,9 @@ type MemcachedProviderPlan struct {
 	Port 			*int `json:"port"`
 }
 
-var defaultPort int = 11211
-var defaultImage string = "memcached"
-var namespace string = "memcached-system"
+var defaultPort = 11211
+var defaultImage = "memcached"
+var namespace = "memcached-system"
 var fakeClient kubernetes.Interface = nil
 
 func IsReadyKubernetes(dep *v1apps.Deployment) bool {
