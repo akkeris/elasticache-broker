@@ -172,7 +172,7 @@ func (provider KubernetesInstanceMemcachedProvider) Provision(Id string, plan *P
 					Args: []string{
 						"-m " + settings.SizeInMegabytes,
 						"-I 50M",
-						"-p " + (*settings.Port),
+						"-p " + strconv.Itoa(*settings.Port),
 					},
 					Ports: []v1core.ContainerPort{
 						v1core.ContainerPort{
