@@ -62,7 +62,8 @@ type BackupSpec struct {
 func IsAvailable(status string) bool {
 	return status == "available" ||
 		// gcloud status
-		status == "RUNNABLE"
+		status == "RUNNABLE" ||
+		status == "Available"
 }
 
 func IsReady(status string) bool {
@@ -72,7 +73,8 @@ func IsReady(status string) bool {
 		status == "backing-up" ||
 		// gcloud states
 		status == "RUNNABLE" ||
-		status == "UNKNOWN_STATE"
+		status == "UNKNOWN_STATE" ||
+		status == "Available"
 }
 
 func InProgress(status string) bool {
@@ -82,7 +84,8 @@ func InProgress(status string) bool {
 		status == "maintenance" || status == "resetting-master-credentials" ||
 		status == "rebooting cluster nodes" ||
 		// gcloud states
-		status == "PENDING_CREATE" || status == "MAINTENANCE"
+		status == "PENDING_CREATE" || status == "MAINTENANCE" ||
+		status == "Progressing" || status == "Creating" || status == "Starting"
 }
 
 func CanGetBindings(status string) bool {
@@ -92,7 +95,7 @@ func CanGetBindings(status string) bool {
 		status != "incompatible-network" &&
 		// gcloud states
 		status != "SUSPENDED" && status != "PENDING_CREATE" && status != "MAINTENANCE" &&
-		status != "FAILED" && status != "UNKNOWN_STATE"
+		status != "FAILED" && status != "UNKNOWN_STATE" && status != "Failed"
 }
 
 func CanBeModified(status string) bool {
