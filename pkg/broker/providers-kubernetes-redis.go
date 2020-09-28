@@ -86,8 +86,16 @@ func (provider KubernetesInstanceRedisProvider) GetInstance(name string, plan *P
 		return nil, err
 	}
 	status := "unknown"
-	if len(result.Status.Conditions) > 0 {
-		status = result.Status.Conditions[0].Message
+	if result.Status.ReadyReplicas > 0 {
+		status = "available"
+	} else if result.Status.Replicas > 0 {
+		status = "creating"
+	}
+	if len(result.Status.Conditions) > 0 && result.Status.Conditions[0].Message == "Terminating" {
+		status = "deleting"
+	}
+	if len(result.Status.Conditions) > 0 && result.Status.Conditions[0].Message == "Pending" {
+		status = "creating"
 	}
 	provider.instanceCache[name+plan.ID] = &Instance{
 		Id:            "", // providers should not store this.
